@@ -2,10 +2,13 @@
 import { apiClient } from './apiClient';
 
 // Get all canteen categories
-export const getAllCategories = async (): Promise<any[]> => {
+export const getAllCategories = async (clubId?: number): Promise<any[]> => {
   try {
-    const response = await apiClient.get('/api/canteen/categories');
-    return response.data || response;
+    const queryParams = new URLSearchParams();
+    if (clubId) queryParams.append('club_id', clubId.toString());
+    
+    const response = await apiClient.get(`/api/canteen/categories?${queryParams.toString()}`);
+    return response;
   } catch (error) {
     console.error('Error fetching categories:', error);
     throw error;
@@ -18,6 +21,7 @@ export const getAllCanteenItems = async (params?: {
   is_available?: boolean;
   page?: number;
   limit?: number;
+  club_id?: number;
 }): Promise<any> => {
   try {
     const queryParams = new URLSearchParams();
@@ -25,9 +29,10 @@ export const getAllCanteenItems = async (params?: {
     if (params?.is_available !== undefined) queryParams.append('is_available', params.is_available.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.club_id) queryParams.append('club_id', params.club_id.toString());
 
     const response = await apiClient.get(`/api/canteen/items?${queryParams.toString()}`);
-    return response.data || response;
+    return response;
   } catch (error) {
     console.error('Error fetching canteen items:', error);
     throw error;
@@ -38,7 +43,7 @@ export const getAllCanteenItems = async (params?: {
 export const getCanteenItemById = async (id: number): Promise<any> => {
   try {
     const response = await apiClient.get(`/api/canteen/items/${id}`);
-    return response.data || response;
+    return response;
   } catch (error) {
     console.error('Error fetching canteen item:', error);
     throw error;
@@ -53,10 +58,11 @@ export const createCanteenItem = async (itemData: {
   category_id: number;
   stock_quantity?: number;
   is_available?: boolean;
+  club_id: number;
 }): Promise<any> => {
   try {
     const response = await apiClient.post('/api/canteen/items', itemData);
-    return response.data || response;
+    return response;
   } catch (error) {
     console.error('Error creating canteen item:', error);
     throw error;
@@ -74,7 +80,7 @@ export const updateCanteenItem = async (id: number, itemData: {
 }): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/canteen/items/${id}`, itemData);
-    return response.data || response;
+    return response;
   } catch (error) {
     console.error('Error updating canteen item:', error);
     throw error;
@@ -105,8 +111,8 @@ export const createCanteenInvoice = async (invoiceData: {
   player_id?: number;
 }): Promise<any> => {
   try {
-    const response = await apiClient.post('/api/invoices/canteen', invoiceData);
-    return response.data || response;
+    const response = await apiClient.post('/api/canteen/invoice', invoiceData);
+    return response;
   } catch (error) {
     console.error('Error creating canteen invoice:', error);
     throw error;
@@ -122,8 +128,8 @@ export const createQuickSale = async (saleData: {
   payment_method?: string;
 }): Promise<any> => {
   try {
-    const response = await apiClient.post('/api/invoices/quick-sale', saleData);
-    return response.data || response;
+    const response = await apiClient.post('/api/canteen/quick-sale', saleData);
+    return response;
   } catch (error) {
     console.error('Error creating quick sale:', error);
     throw error;
@@ -142,8 +148,8 @@ export const getCanteenSalesReport = async (clubId: number, params?: {
     if (params?.endDate) queryParams.append('endDate', params.endDate);
     if (params?.item_id) queryParams.append('item_id', params.item_id.toString());
 
-    const response = await apiClient.get(`/api/invoices/canteen-report/${clubId}?${queryParams.toString()}`);
-    return response.data || response;
+    const response = await apiClient.get(`/api/canteen/sales-report/${clubId}?${queryParams.toString()}`);
+    return response;
   } catch (error) {
     console.error('Error fetching canteen sales report:', error);
     throw error;

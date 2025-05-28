@@ -1,3 +1,4 @@
+
 // Update API_BASE_URL to your actual API URL - modify this if needed
 const API_BASE_URL = "http://localhost:5000";
 
@@ -27,7 +28,9 @@ export const apiClient = {
       throw new Error(error.message || "An error occurred while fetching data");
     }
 
-    return response.json();
+    const result = await response.json();
+    // Handle the {data: {...}} wrapper structure from your API
+    return result.data || result;
   },
 
   post: async (path: string, data: any) => {
@@ -58,7 +61,9 @@ export const apiClient = {
       );
     }
 
-    return response.json();
+    const result = await response.json();
+    // Handle the {data: {...}} wrapper structure from your API
+    return result.data || result;
   },
 
   put: async (path: string, data: any) => {
@@ -87,7 +92,9 @@ export const apiClient = {
       throw new Error(error.message || "An error occurred while updating data");
     }
 
-    return response.json();
+    const result = await response.json();
+    // Handle the {data: {...}} wrapper structure from your API
+    return result.data || result;
   },
 
   delete: async (path: string) => {
@@ -115,7 +122,9 @@ export const apiClient = {
       throw new Error(error.message || "An error occurred while deleting data");
     }
 
-    return response.json();
+    const result = await response.json();
+    // Handle the {data: {...}} wrapper structure from your API
+    return result.data || result;
   },
 };
 
@@ -145,7 +154,8 @@ async function refreshAccessToken(): Promise<boolean> {
       return false;
     }
 
-    const data = await response.json();
+    const result = await response.json();
+    const data = result.data || result;
     if (data.accessToken) {
       localStorage.setItem("accessToken", data.accessToken);
       return true;
