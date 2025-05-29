@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useData } from "@/context/DataContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -83,10 +84,21 @@ const AdminTableList = () => {
       return;
     }
     
+    // Convert table_number to number for API call
+    const tableNumber = parseInt(newTable.table_number as string);
+    if (isNaN(tableNumber)) {
+      toast({
+        title: "Error",
+        description: "Table number must be a valid number",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     try {
       await createTable({
-        table_number: newTable.table_number,
+        table_number: tableNumber,
         status: newTable.status || "available"
       });
       
@@ -94,7 +106,7 @@ const AdminTableList = () => {
       
       toast({
         title: "Table Added",
-        description: `${newTable.table_number} has been added`,
+        description: `Table ${tableNumber} has been added`,
       });
       
       setDialogOpen(false);
@@ -280,9 +292,10 @@ const AdminTableList = () => {
               <Label htmlFor="tableNumber">Table Number</Label>
               <Input
                 id="tableNumber"
+                type="number"
                 value={newTable.table_number}
                 onChange={(e) => setNewTable({ ...newTable, table_number: e.target.value })}
-                placeholder="e.g. Table 1"
+                placeholder="e.g. 1"
                 disabled={isLoading}
               />
             </div>

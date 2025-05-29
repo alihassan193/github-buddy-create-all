@@ -7,7 +7,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: (emailOrUsername: string, password: string) => Promise<void>;
+  login: (email: string, password: string) => Promise<void>;
   register: (username: string, email: string, password: string, role: 'super_admin' | 'sub_admin' | 'manager', subAdminId?: number) => Promise<any>;
   logout: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;

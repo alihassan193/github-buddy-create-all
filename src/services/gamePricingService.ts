@@ -1,13 +1,14 @@
 
 import { apiClient } from './apiClient';
 
-// Create game pricing
+// Create game pricing - matches /api/game-pricing endpoint
 export const createGamePricing = async (pricingData: {
   game_type_id: number;
-  table_id: number;
+  club_id: number;
   price_per_hour?: number;
-  price_per_game?: number;
-  effective_from?: string;
+  price_per_player?: number;
+  minimum_charge?: number;
+  is_active?: boolean;
 }): Promise<any> => {
   try {
     const response = await apiClient.post('/api/game-pricing', pricingData);
@@ -18,7 +19,7 @@ export const createGamePricing = async (pricingData: {
   }
 };
 
-// Get all game pricings
+// Get all game pricings - matches /api/game-pricing endpoint
 export const getAllGamePricings = async (): Promise<any[]> => {
   try {
     const response = await apiClient.get('/api/game-pricing');
@@ -40,13 +41,12 @@ export const getGamePricingById = async (id: number): Promise<any> => {
   }
 };
 
-// Update game pricing
+// Update game pricing - matches /api/game-pricing/:id endpoint
 export const updateGamePricing = async (id: number, pricingData: {
-  game_type_id?: number;
-  table_id?: number;
   price_per_hour?: number;
-  price_per_game?: number;
-  effective_from?: string;
+  price_per_player?: number;
+  minimum_charge?: number;
+  is_active?: boolean;
 }): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/game-pricing/${id}`, pricingData);

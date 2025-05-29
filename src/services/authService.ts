@@ -1,10 +1,11 @@
+
 import { User, UserPermissions } from '../types';
 import { apiClient } from './apiClient';
 
 // Login user - updated to match backend signin endpoint
-export const login = async (username: string, password: string): Promise<any> => {
+export const login = async (email: string, password: string): Promise<any> => {
   try {
-    const result = await apiClient.post('/api/auth/signin', { username, password });
+    const result = await apiClient.post('/api/auth/signin', { email, password });
     
     // The backend returns { success: true, message: "...", data: { user, accessToken, refreshToken } }
     const responseData = result.data || result;
@@ -82,8 +83,8 @@ export const refreshToken = async (): Promise<string | null> => {
 // Logout user - matches backend endpoint
 export const logout = async (): Promise<void> => {
   try {
-    // Call backend logout endpoint
-    await apiClient.post('/api/auth/logout', {});
+    // Call backend logout endpoint - note the endpoint is signout in the API
+    await apiClient.post('/api/auth/signout', {});
   } catch (error) {
     console.error('Logout error:', error);
   } finally {

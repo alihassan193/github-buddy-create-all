@@ -74,11 +74,11 @@ export const useAuthProvider = () => {
     checkAuth();
   }, []);
   
-  const login = async (emailOrUsername: string, password: string) => {
+  const login = async (email: string, password: string) => {
     setIsLoading(true);
     
     try {
-      const response = await loginService(emailOrUsername, password);
+      const response = await loginService(email, password);
       
       // Map the user data to our app format - the response now contains user data correctly
       const appUser = mapDatabaseUserToAppUser(response.user, response.user.permission || response.user.Permission);
@@ -140,8 +140,8 @@ export const useAuthProvider = () => {
 
   const getAllUsers = async (): Promise<User[]> => {
     try {
-      const fetchedUsers = await getAllUsersService();
-      return fetchedUsers;
+      const response = await getAllUsersService();
+      return response.users || [];
     } catch (error) {
       console.error("Failed to fetch users:", error);
       return [];
@@ -160,7 +160,7 @@ export const useAuthProvider = () => {
   
   const getUserById = async (userId: number, role: string): Promise<User | null> => {
     try {
-      return await getUserByIdService(userId, role);
+      return await getUserByIdService(userId);
     } catch (error) {
       console.error("Failed to fetch user details:", error);
       return null;

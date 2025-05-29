@@ -1,17 +1,12 @@
 
 import { apiClient } from './apiClient';
 
-// Create invoice
+// Create invoice - matches /api/invoices endpoint
 export const createInvoice = async (invoiceData: {
-  player_id?: number;
-  session_id?: number;
-  items?: Array<{
-    item_name: string;
-    quantity: number;
-    unit_price: number;
-  }>;
-  tax_rate?: number;
-  discount?: number;
+  session_id: number;
+  payment_method?: string;
+  discount_percentage?: number;
+  tax_percentage?: number;
 }): Promise<any> => {
   try {
     const response = await apiClient.post('/api/invoices', invoiceData);
@@ -22,19 +17,19 @@ export const createInvoice = async (invoiceData: {
   }
 };
 
-// Get all invoices
+// Get all invoices - matches /api/invoices endpoint
 export const getAllInvoices = async (params?: {
-  status?: string;
-  player_id?: number;
   page?: number;
   limit?: number;
+  start_date?: string;
+  end_date?: string;
 }): Promise<any> => {
   try {
     const queryParams = new URLSearchParams();
-    if (params?.status) queryParams.append('status', params.status);
-    if (params?.player_id) queryParams.append('player_id', params.player_id.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.start_date) queryParams.append('start_date', params.start_date);
+    if (params?.end_date) queryParams.append('end_date', params.end_date);
 
     const response = await apiClient.get(`/api/invoices?${queryParams.toString()}`);
     return response.data || response;
@@ -44,7 +39,7 @@ export const getAllInvoices = async (params?: {
   }
 };
 
-// Get invoice by ID
+// Get invoice by ID - matches /api/invoices/:id endpoint
 export const getInvoiceById = async (id: number): Promise<any> => {
   try {
     const response = await apiClient.get(`/api/invoices/${id}`);
@@ -55,7 +50,7 @@ export const getInvoiceById = async (id: number): Promise<any> => {
   }
 };
 
-// Update invoice status
+// Update invoice status - matches /api/invoices/:id/status endpoint
 export const updateInvoiceStatus = async (id: number, statusData: {
   status: 'pending' | 'paid' | 'cancelled';
   payment_method?: string;

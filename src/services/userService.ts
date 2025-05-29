@@ -3,16 +3,16 @@ import { User, UserPermissions } from "../types";
 import { apiClient } from "./apiClient";
 import { mapDatabaseUserToAppUser } from "./authService";
 
-// Get all users - matches /api/admin/users endpoint
-export const getAllUsers = async (): Promise<User[]> => {
+// Get all users - matches /api/admin/users endpoint with pagination
+export const getAllUsers = async (page: number = 1, limit: number = 10): Promise<{ users: User[], total: number, page: number, totalPages: number }> => {
   try {
-    const response = await apiClient.get("/api/admin/users");
+    const response = await apiClient.get(`/api/admin/users?page=${page}&limit=${limit}`);
     
     console.log("API Response - All Users:", response);
     
     // The API returns users with permission objects included
-    const allUsers = Array.isArray(response) 
-      ? response.map((user: any) => {
+    const allUsers = Array.isArray(response.users) 
+      ? response.users.map((user: any) => {
           // Extract permissions from the included Permission object
           const permissions = user.Permission ? {
             can_manage_tables: user.Permission.can_manage_tables === 1,
@@ -30,19 +30,24 @@ export const getAllUsers = async (): Promise<User[]> => {
       : [];
       
     console.log("Mapped Users:", allUsers);
-    return allUsers.filter(Boolean) as User[];
+    return {
+      users: allUsers.filter(Boolean) as User[],
+      total: response.total || 0,
+      page: response.page || 1,
+      totalPages: response.totalPages || 1
+    };
   } catch (error) {
     console.error("Error fetching users:", error);
     throw error;
   }
 };
 
-// Create admin (sub_admin) - matches /api/admin/create-admin endpoint
-export const createAdmin = async (
+// Create sub-admin - matches /api/admin/create-admin endpoint
+export const createSubAdmin = async (
   username: string, 
   email: string, 
-  password: string, 
-  role: 'sub_admin',
+  password: string,
+  club_ids?: number[],
   permissions?: {
     can_manage_tables?: boolean;
     can_manage_canteen?: boolean;
@@ -54,15 +59,14 @@ export const createAdmin = async (
       username,
       email,
       password,
-      role,
-      can_manage_tables: permissions?.can_manage_tables ?? true,
-      can_manage_canteen: permissions?.can_manage_canteen ?? true,
-      can_view_reports: permissions?.can_view_reports ?? true
+      role: 'sub_admin',
+      club_ids: club_ids || [],
+      ...permissions
     });
     
     return userData;
   } catch (error) {
-    console.error('Error creating admin:', error);
+    console.error('Error creating sub-admin:', error);
     throw error;
   }
 };
@@ -71,13 +75,23 @@ export const createAdmin = async (
 export const createManager = async (
   username: string, 
   email: string, 
-  password: string
+  password: string,
+  club_id: number,
+  permissions?: {
+    can_manage_tables?: boolean;
+    can_manage_canteen?: boolean;
+    can_view_reports?: boolean;
+  }
 ) => {
   try {
     const userData = await apiClient.post('/api/admin/create-manager', {
       username,
       email,
-      password
+      password,
+      club_id,
+      can_manage_tables: permissions?.can_manage_tables ?? true,
+      can_manage_canteen: permissions?.can_manage_canteen ?? true,
+      can_view_reports: permissions?.can_view_reports ?? true
     });
     
     return userData;
@@ -93,18 +107,33 @@ export const createUser = async (
   email: string, 
   password: string, 
   role: 'super_admin' | 'sub_admin' | 'manager',
-  subAdminId?: number
+  club_id?: number,
+  club_ids?: number[]
 ) => {
   try {
     if (role === 'sub_admin') {
-      return await createAdmin(username, email, password, role);
+      return await createSubAdmin(username, email, password, club_ids);
     } else if (role === 'manager') {
-      return await createManager(username, email, password);
+      if (!club_id) {
+        throw new Error("Club ID is required for managers");
+      }
+      return await createManager(username, email, password, club_id);
     } else {
       throw new Error("Super admin creation not supported through this endpoint");
     }
   } catch (error) {
     console.error('Error creating user:', error);
+    throw error;
+  }
+};
+
+// Get managed clubs - matches /api/admin/managed-clubs endpoint
+export const getManagedClubs = async (): Promise<any[]> => {
+  try {
+    const response = await apiClient.get("/api/admin/managed-clubs");
+    return response.clubs || response;
+  } catch (error) {
+    console.error("Error fetching managed clubs:", error);
     throw error;
   }
 };
@@ -121,60 +150,29 @@ export const setUserStatus = async (userId: number, isActive: boolean): Promise<
   }
 };
 
-// Get all admins - matches /api/admin/admins endpoint
+// Legacy function for backward compatibility
 export const getAllAdmins = async (): Promise<User[]> => {
   try {
-    const response = await apiClient.get("/api/admin/admins");
-    
-    console.log("API Response - All Admins:", response);
-    
-    const allAdmins = Array.isArray(response) 
-      ? response.map((admin: any) => {
-          const permissions = admin.Permission ? {
-            can_manage_tables: admin.Permission.can_manage_tables === 1,
-            can_manage_canteen: admin.Permission.can_manage_canteen === 1,
-            can_view_reports: admin.Permission.can_view_reports === 1
-          } : {
-            can_manage_tables: true,
-            can_manage_canteen: true,
-            can_view_reports: true
-          };
-          
-          return mapDatabaseUserToAppUser(admin, permissions);
-        })
-      : [];
-      
-    console.log("Mapped Admins:", allAdmins);
-    return allAdmins.filter(Boolean) as User[];
+    const response = await getAllUsers(1, 100); // Get first 100 users
+    return response.users.filter(user => user.role === 'sub_admin' || user.role === 'super_admin');
   } catch (error) {
     console.error("Error fetching admins:", error);
-    throw error;
+    return [];
   }
 };
 
-// Get admin by ID - matches /api/admin/admins/:id endpoint
-export const getAdminById = async (adminId: number): Promise<User | null> => {
+// Get user by ID
+export const getUserById = async (userId: number): Promise<User | null> => {
   try {
-    const adminData = await apiClient.get(`/api/admin/admins/${adminId}`);
-    
-    const permissions = adminData.Permission ? {
-      can_manage_tables: adminData.Permission.can_manage_tables === 1,
-      can_manage_canteen: adminData.Permission.can_manage_canteen === 1,
-      can_view_reports: adminData.Permission.can_view_reports === 1
-    } : {
-      can_manage_tables: true,
-      can_manage_canteen: true,
-      can_view_reports: true
-    };
-    
-    return mapDatabaseUserToAppUser(adminData, permissions);
+    const response = await getAllUsers(1, 1000); // Get all users and find the one
+    return response.users.find(user => user.id === userId) || null;
   } catch (error) {
-    console.error('Error fetching admin details:', error);
+    console.error('Error fetching user details:', error);
     return null;
   }
 };
 
-// Update admin - matches /api/admin/admins/:id endpoint
+// Update admin/manager
 export const updateAdmin = async (
   adminId: number, 
   adminData: {
@@ -187,92 +185,19 @@ export const updateAdmin = async (
   }
 ): Promise<void> => {
   try {
-    await apiClient.put(`/api/admin/admins/${adminId}`, adminData);
+    await apiClient.put(`/api/admin/users/${adminId}`, adminData);
   } catch (error) {
     console.error('Error updating admin:', error);
     throw error;
   }
 };
 
-// Delete admin - matches /api/admin/admins/:id endpoint
+// Delete admin/manager
 export const deleteAdmin = async (adminId: number): Promise<void> => {
   try {
-    await apiClient.delete(`/api/admin/admins/${adminId}`);
+    await apiClient.delete(`/api/admin/users/${adminId}`);
   } catch (error) {
     console.error('Error deleting admin:', error);
-    throw error;
-  }
-};
-
-// Generic user functions that route to appropriate endpoints
-export const getUserById = async (userId: number, role: string): Promise<User | null> => {
-  try {
-    if (role === 'sub_admin') {
-      return await getAdminById(userId);
-    } else {
-      // For managers, we don't have a specific endpoint, so we'll get them from the users list
-      const users = await getAllUsers();
-      return users.find(user => user.id === userId) || null;
-    }
-  } catch (error) {
-    console.error('Error fetching user details:', error);
-    return null;
-  }
-};
-
-export const updateUser = async (
-  userId: number, 
-  userData: {
-    username?: string;
-    email?: string;
-    password?: string;
-    role?: string;
-    permissions?: {
-      can_manage_tables?: boolean;
-      can_manage_canteen?: boolean;
-      can_view_reports?: boolean;
-    };
-  }
-): Promise<void> => {
-  try {
-    if (userData.role === 'sub_admin') {
-      // Update admin using admin endpoint
-      const adminUpdateData: any = {};
-      if (userData.username) adminUpdateData.username = userData.username;
-      if (userData.email) adminUpdateData.email = userData.email;
-      if (userData.password) adminUpdateData.password = userData.password;
-      if (userData.permissions?.can_manage_tables !== undefined) {
-        adminUpdateData.can_manage_tables = userData.permissions.can_manage_tables;
-      }
-      if (userData.permissions?.can_manage_canteen !== undefined) {
-        adminUpdateData.can_manage_canteen = userData.permissions.can_manage_canteen;
-      }
-      if (userData.permissions?.can_view_reports !== undefined) {
-        adminUpdateData.can_view_reports = userData.permissions.can_view_reports;
-      }
-      
-      await updateAdmin(userId, adminUpdateData);
-    } else {
-      // For managers, only status updates are supported via the users endpoint
-      if (userData.permissions || userData.username || userData.email || userData.password) {
-        throw new Error("Manager profile updates not supported through this endpoint");
-      }
-    }
-  } catch (error) {
-    console.error('Error updating user:', error);
-    throw error;
-  }
-};
-
-export const deleteUser = async (userId: number, role: string): Promise<void> => {
-  try {
-    if (role === 'sub_admin') {
-      await deleteAdmin(userId);
-    } else {
-      throw new Error("Manager deletion not supported through current endpoints");
-    }
-  } catch (error) {
-    console.error('Error deleting user:', error);
     throw error;
   }
 };

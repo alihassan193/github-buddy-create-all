@@ -1,38 +1,28 @@
-
 import { apiClient } from './apiClient';
 
-// Get all canteen categories
-export const getAllCategories = async (clubId?: number): Promise<any[]> => {
+// Get all canteen categories (keeping existing functionality)
+export const getAllCategories = async (): Promise<any[]> => {
   try {
-    const queryParams = new URLSearchParams();
-    if (clubId) queryParams.append('club_id', clubId.toString());
-    
-    const response = await apiClient.get(`/api/canteen/categories?${queryParams.toString()}`);
-    return response;
+    const response = await apiClient.get('/api/canteen/categories');
+    return response.data || response;
   } catch (error) {
     console.error('Error fetching categories:', error);
     throw error;
   }
 };
 
-// Get all canteen items
+// Get all canteen items - matches /api/canteen/items endpoint
 export const getAllCanteenItems = async (params?: {
-  category_id?: number;
-  is_available?: boolean;
   page?: number;
   limit?: number;
-  club_id?: number;
 }): Promise<any> => {
   try {
     const queryParams = new URLSearchParams();
-    if (params?.category_id) queryParams.append('category_id', params.category_id.toString());
-    if (params?.is_available !== undefined) queryParams.append('is_available', params.is_available.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
-    if (params?.club_id) queryParams.append('club_id', params.club_id.toString());
 
     const response = await apiClient.get(`/api/canteen/items?${queryParams.toString()}`);
-    return response;
+    return response.data || response;
   } catch (error) {
     console.error('Error fetching canteen items:', error);
     throw error;
@@ -43,26 +33,27 @@ export const getAllCanteenItems = async (params?: {
 export const getCanteenItemById = async (id: number): Promise<any> => {
   try {
     const response = await apiClient.get(`/api/canteen/items/${id}`);
-    return response;
+    return response.data || response;
   } catch (error) {
     console.error('Error fetching canteen item:', error);
     throw error;
   }
 };
 
-// Create canteen item
+// Create canteen item - matches /api/canteen/items endpoint
 export const createCanteenItem = async (itemData: {
   name: string;
   description?: string;
   price: number;
   category_id: number;
-  stock_quantity?: number;
-  is_available?: boolean;
   club_id: number;
+  is_available?: boolean;
+  initial_stock?: number;
+  minimum_stock?: number;
 }): Promise<any> => {
   try {
     const response = await apiClient.post('/api/canteen/items', itemData);
-    return response;
+    return response.data || response;
   } catch (error) {
     console.error('Error creating canteen item:', error);
     throw error;
@@ -75,12 +66,11 @@ export const updateCanteenItem = async (id: number, itemData: {
   description?: string;
   price?: number;
   category_id?: number;
-  stock_quantity?: number;
   is_available?: boolean;
 }): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/canteen/items/${id}`, itemData);
-    return response;
+    return response.data || response;
   } catch (error) {
     console.error('Error updating canteen item:', error);
     throw error;
@@ -97,61 +87,60 @@ export const deleteCanteenItem = async (id: number): Promise<void> => {
   }
 };
 
-// Create canteen invoice
-export const createCanteenInvoice = async (invoiceData: {
-  club_id: number;
-  customer_name?: string;
-  customer_phone?: string;
-  customer_email?: string;
-  items: Array<{ canteen_item_id: number; quantity: number }>;
-  payment_method?: string;
-  discount_amount?: number;
-  notes?: string;
-  is_guest?: boolean;
-  player_id?: number;
+// Update stock - matches /api/canteen/stock/:id endpoint
+export const updateStock = async (itemId: number, stockData: {
+  quantity: number;
+  operation: 'add' | 'subtract';
 }): Promise<any> => {
   try {
-    const response = await apiClient.post('/api/canteen/invoice', invoiceData);
-    return response;
+    const response = await apiClient.put(`/api/canteen/stock/${itemId}`, stockData);
+    return response.data || response;
   } catch (error) {
-    console.error('Error creating canteen invoice:', error);
+    console.error('Error updating stock:', error);
     throw error;
   }
 };
 
-// Create quick sale
-export const createQuickSale = async (saleData: {
-  club_id: number;
-  canteen_item_id: number;
-  quantity?: number;
-  customer_name?: string;
-  payment_method?: string;
-}): Promise<any> => {
+// Get low stock items - matches /api/canteen/low-stock endpoint
+export const getLowStockItems = async (): Promise<any[]> => {
   try {
-    const response = await apiClient.post('/api/canteen/quick-sale', saleData);
-    return response;
+    const response = await apiClient.get('/api/canteen/low-stock');
+    return response.data || response;
   } catch (error) {
-    console.error('Error creating quick sale:', error);
+    console.error('Error fetching low stock items:', error);
     throw error;
   }
 };
 
-// Get canteen sales report
-export const getCanteenSalesReport = async (clubId: number, params?: {
-  startDate?: string;
-  endDate?: string;
-  item_id?: number;
+// Add order to session - matches /api/canteen/order endpoint
+export const addOrderToSession = async (orderData: {
+  session_id: number;
+  items: Array<{
+    item_id: number;
+    quantity: number;
+  }>;
 }): Promise<any> => {
   try {
-    const queryParams = new URLSearchParams();
-    if (params?.startDate) queryParams.append('startDate', params.startDate);
-    if (params?.endDate) queryParams.append('endDate', params.endDate);
-    if (params?.item_id) queryParams.append('item_id', params.item_id.toString());
-
-    const response = await apiClient.get(`/api/canteen/sales-report/${clubId}?${queryParams.toString()}`);
-    return response;
+    const response = await apiClient.post('/api/canteen/order', orderData);
+    return response.data || response;
   } catch (error) {
-    console.error('Error fetching canteen sales report:', error);
+    console.error('Error adding order to session:', error);
     throw error;
   }
+};
+
+// Legacy functions for backward compatibility
+export const createCanteenInvoice = async (invoiceData: any): Promise<any> => {
+  console.warn('createCanteenInvoice is deprecated, use invoice service instead');
+  return addOrderToSession(invoiceData);
+};
+
+export const createQuickSale = async (saleData: any): Promise<any> => {
+  console.warn('createQuickSale is deprecated, use addOrderToSession instead');
+  return addOrderToSession(saleData);
+};
+
+export const getCanteenSalesReport = async (clubId: number, params?: any): Promise<any> => {
+  console.warn('getCanteenSalesReport is deprecated, use reports service instead');
+  return {};
 };

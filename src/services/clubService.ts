@@ -1,12 +1,13 @@
 
 import { apiClient } from './apiClient';
 
-// Create a new club
+// Create a new club - matches /api/clubs endpoint
 export const createClub = async (clubData: {
   name: string;
   address?: string;
   phone?: string;
   email?: string;
+  opening_hours?: string;
   description?: string;
 }): Promise<any> => {
   try {
@@ -18,7 +19,7 @@ export const createClub = async (clubData: {
   }
 };
 
-// Get all clubs
+// Get all clubs - matches /api/clubs endpoint
 export const getAllClubs = async (params?: {
   page?: number;
   limit?: number;
@@ -36,7 +37,7 @@ export const getAllClubs = async (params?: {
   }
 };
 
-// Get club by ID
+// Get club by ID - matches /api/clubs/:id endpoint
 export const getClubById = async (id: number): Promise<any> => {
   try {
     const response = await apiClient.get(`/api/clubs/${id}`);
@@ -47,14 +48,14 @@ export const getClubById = async (id: number): Promise<any> => {
   }
 };
 
-// Update club
+// Update club - matches /api/clubs/:id endpoint
 export const updateClub = async (id: number, clubData: {
   name?: string;
   address?: string;
   phone?: string;
   email?: string;
+  opening_hours?: string;
   description?: string;
-  status?: string;
 }): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/clubs/${id}`, clubData);
@@ -65,7 +66,7 @@ export const updateClub = async (id: number, clubData: {
   }
 };
 
-// Delete club
+// Delete club - matches /api/clubs/:id endpoint
 export const deleteClub = async (id: number): Promise<void> => {
   try {
     await apiClient.delete(`/api/clubs/${id}`);

@@ -1,14 +1,13 @@
+
 import { apiClient } from './apiClient';
 
-// Get all tables
+// Get all tables - matches /api/tables endpoint
 export const getAllTables = async (params?: {
-  status?: string;
   page?: number;
   limit?: number;
 }): Promise<any> => {
   try {
     const queryParams = new URLSearchParams();
-    if (params?.status) queryParams.append('status', params.status);
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
@@ -31,15 +30,22 @@ export const getTableById = async (id: number): Promise<any> => {
   }
 };
 
-// Create table
+// Create table - matches /api/tables endpoint
 export const createTable = async (tableData: {
-  table_number: string;
+  table_number: number;
+  club_id?: number; // Made optional with default fallback
   table_type?: string;
-  hourly_rate?: number;
   status?: string;
+  description?: string;
 }): Promise<any> => {
   try {
-    const response = await apiClient.post('/api/tables', tableData);
+    // Use a default club_id of 1 if not provided
+    const dataWithClubId = {
+      ...tableData,
+      club_id: tableData.club_id || 1
+    };
+    
+    const response = await apiClient.post('/api/tables', dataWithClubId);
     return response.data || response;
   } catch (error) {
     console.error('Error creating table:', error);
@@ -49,10 +55,10 @@ export const createTable = async (tableData: {
 
 // Update table
 export const updateTable = async (id: number, tableData: {
-  table_number?: string;
+  table_number?: number;
   table_type?: string;
-  hourly_rate?: number;
   status?: string;
+  description?: string;
 }): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/tables/${id}`, tableData);
@@ -73,7 +79,7 @@ export const deleteTable = async (id: number): Promise<void> => {
   }
 };
 
-// Get available tables
+// Get available tables - matches /api/tables/available endpoint
 export const getAvailableTables = async (): Promise<any[]> => {
   try {
     const response = await apiClient.get('/api/tables/available');
@@ -84,7 +90,7 @@ export const getAvailableTables = async (): Promise<any[]> => {
   }
 };
 
-// Update table status
+// Update table status - matches /api/tables/:id/status endpoint
 export const updateTableStatus = async (id: number, status: string): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/tables/${id}/status`, { status });
@@ -95,15 +101,15 @@ export const updateTableStatus = async (id: number, status: string): Promise<any
   }
 };
 
-// Update table pricing
-export const updateTablePricing = async (tableId: number, pricingData: Array<{
+// Update table pricing - matches /api/tables/:id/pricing endpoint
+export const updateTablePricing = async (id: number, pricingData: Array<{
   game_type_id: number;
   price: number;
   time_limit_minutes?: number;
-  is_unlimited: boolean;
+  is_unlimited?: boolean;
 }>): Promise<any> => {
   try {
-    const response = await apiClient.put(`/api/tables/${tableId}/pricing`, { pricing: pricingData });
+    const response = await apiClient.put(`/api/tables/${id}/pricing`, { pricing: pricingData });
     return response.data || response;
   } catch (error) {
     console.error('Error updating table pricing:', error);
