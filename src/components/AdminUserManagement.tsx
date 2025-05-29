@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -89,6 +88,7 @@ const AdminUserManagement = () => {
   
   // Only super_admin can create other super_admins
   const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isSubAdmin = currentUser?.role === 'sub_admin';
   
   const handleCreateClub = async () => {
     if (!clubName || !clubAddress) {
@@ -109,7 +109,10 @@ const AdminUserManagement = () => {
         description: clubDescription || undefined
       };
       
-      await createClub(clubData);
+      console.log("Creating club with data:", clubData);
+      
+      const response = await createClub(clubData);
+      console.log("Club creation response:", response);
       
       // Refresh clubs list
       const updatedClubs = await getAllClubs();
@@ -128,6 +131,7 @@ const AdminUserManagement = () => {
       setClubDescription("");
       setIsClubDialogOpen(false);
     } catch (error: any) {
+      console.error("Error creating club:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create club",
@@ -140,7 +144,7 @@ const AdminUserManagement = () => {
     if (!username || !email || !password) {
       toast({
         title: "Error",
-        description: "Please fill in all fields",
+        description: "Please fill in all required fields",
         variant: "destructive"
       });
       return;
@@ -163,6 +167,8 @@ const AdminUserManagement = () => {
           throw new Error("Only super admins can create super admin accounts");
         }
         
+        console.log("Creating user with data:", { username, email, role, selectedClubId });
+        
         await createUser(username, email, password, role, selectedClubId || undefined);
         
         // Refresh the users list
@@ -183,6 +189,7 @@ const AdminUserManagement = () => {
         setIsUserDialogOpen(false);
       }
     } catch (error: any) {
+      console.error("Error creating user:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to create user",
@@ -249,11 +256,11 @@ const AdminUserManagement = () => {
                   Create Club
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader>
                   <DialogTitle>Create New Club</DialogTitle>
                   <DialogDescription>
-                    Create a new snooker club in the system.
+                    Create a new snooker club in the system. Name and address are required fields.
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4">
@@ -264,6 +271,7 @@ const AdminUserManagement = () => {
                       value={clubName}
                       onChange={(e) => setClubName(e.target.value)}
                       placeholder="Enter club name"
+                      required
                     />
                   </div>
                   <div className="grid gap-2">
@@ -273,6 +281,7 @@ const AdminUserManagement = () => {
                       value={clubAddress}
                       onChange={(e) => setClubAddress(e.target.value)}
                       placeholder="Enter club address"
+                      required
                     />
                   </div>
                   <div className="grid gap-2">
@@ -305,8 +314,12 @@ const AdminUserManagement = () => {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsClubDialogOpen(false)}>Cancel</Button>
-                  <Button onClick={handleCreateClub}>Create Club</Button>
+                  <Button variant="outline" onClick={() => setIsClubDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateClub} disabled={!clubName || !clubAddress}>
+                    Create Club
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>
@@ -319,45 +332,48 @@ const AdminUserManagement = () => {
                 Add New User
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="sm:max-w-[500px]">
               <DialogHeader>
                 <DialogTitle>Create New User</DialogTitle>
                 <DialogDescription>
-                  Create a new user account with appropriate roles.
+                  Create a new user account with appropriate roles and club assignment.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4 py-4">
                 <div className="grid gap-2">
-                  <Label htmlFor="username">Username</Label>
+                  <Label htmlFor="username">Username *</Label>
                   <Input
                     id="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder="Enter username"
+                    required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label htmlFor="email">Email *</Label>
                   <Input
                     id="email"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="Enter email"
+                    required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="password">Password</Label>
+                  <Label htmlFor="password">Password *</Label>
                   <Input
                     id="password"
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter password"
+                    required
                   />
                 </div>
                 <div className="grid gap-2">
-                  <Label htmlFor="role">Role</Label>
+                  <Label htmlFor="role">Role *</Label>
                   <Select value={role} onValueChange={(value: "super_admin" | "sub_admin" | "manager") => setRole(value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select role" />
@@ -365,17 +381,20 @@ const AdminUserManagement = () => {
                     <SelectContent>
                       {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
                       {isSuperAdmin && <SelectItem value="sub_admin">Sub Admin (Club Owner)</SelectItem>}
-                      {(isSuperAdmin || currentUser?.role === 'sub_admin') && (
+                      {(isSuperAdmin || isSubAdmin) && (
                         <SelectItem value="manager">Manager</SelectItem>
                       )}
                     </SelectContent>
                   </Select>
                 </div>
                 
-                {role === 'manager' && (
+                {(role === 'manager' || role === 'sub_admin') && (
                   <div className="grid gap-2">
-                    <Label htmlFor="club">Club</Label>
-                    <Select value={selectedClubId?.toString() || ""} onValueChange={(value) => setSelectedClubId(parseInt(value))}>
+                    <Label htmlFor="club">Club {role === 'manager' ? '*' : ''}</Label>
+                    <Select 
+                      value={selectedClubId?.toString() || ""} 
+                      onValueChange={(value) => setSelectedClubId(value ? parseInt(value) : null)}
+                    >
                       <SelectTrigger>
                         <SelectValue placeholder="Select club" />
                       </SelectTrigger>
@@ -387,12 +406,22 @@ const AdminUserManagement = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {role === 'manager' && !selectedClubId && (
+                      <p className="text-sm text-red-500">Club selection is required for managers</p>
+                    )}
                   </div>
                 )}
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>Cancel</Button>
-                <Button onClick={handleCreateUser}>Create User</Button>
+                <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={handleCreateUser}
+                  disabled={!username || !email || !password || (role === 'manager' && !selectedClubId)}
+                >
+                  Create User
+                </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
