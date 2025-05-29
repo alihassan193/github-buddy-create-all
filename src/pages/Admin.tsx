@@ -10,6 +10,7 @@ import AdminTableList from "@/components/AdminTableList";
 import AdminCanteenInventory from "@/components/AdminCanteenInventory";
 import { useAuth } from "@/context/AuthContext";
 import AdminUserManagement from "@/components/AdminUserManagement";
+import AdminClubManagement from "@/components/AdminClubManagement";
 
 const Admin = () => {
   const { invoices } = useData();
@@ -23,21 +24,27 @@ const Admin = () => {
   
   // Determine which tabs to show based on role
   const showUserManagement = isSuperAdmin || isSubAdmin; // Both can manage users, but super_admin sees all, sub_admin only sees their managers
+  const showClubManagement = isSuperAdmin; // Only super admins can manage clubs
   const showTableManagement = isSuperAdmin || isSubAdmin; // Managers don't manage tables
   const showCanteen = true; // Everyone can access canteen
   const showInvoices = isSuperAdmin || isSubAdmin; // Only admins see all invoices
+  
+  const tabCount = [showTableManagement, showInvoices, showCanteen, showUserManagement, showClubManagement].filter(Boolean).length;
   
   return (
     <div className="container mx-auto py-6 px-4">
       <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className={`grid ${showUserManagement ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <TabsList className={`grid grid-cols-${tabCount}`}>
           {showTableManagement && <TabsTrigger value="tables">Tables Management</TabsTrigger>}
           {showInvoices && <TabsTrigger value="invoices">Invoices</TabsTrigger>}
           {showCanteen && <TabsTrigger value="canteen">Canteen Inventory</TabsTrigger>}
           {showUserManagement && (
             <TabsTrigger value="users">User Management</TabsTrigger>
+          )}
+          {showClubManagement && (
+            <TabsTrigger value="clubs">Club Management</TabsTrigger>
           )}
         </TabsList>
         
@@ -136,6 +143,22 @@ const Admin = () => {
               </CardHeader>
               <CardContent>
                 <AdminUserManagement />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        {showClubManagement && (
+          <TabsContent value="clubs">
+            <Card>
+              <CardHeader>
+                <CardTitle>Club Management</CardTitle>
+                <CardDescription>
+                  Create and manage snooker clubs in the system.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AdminClubManagement />
               </CardContent>
             </Card>
           </TabsContent>

@@ -30,14 +30,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { User } from "@/types";
-import { Shield, UserPlus, Building } from "lucide-react";
-import { createClub, getAllClubs } from "@/services/clubService";
+import { Shield, UserPlus } from "lucide-react";
+import { getAllClubs } from "@/services/clubService";
 
 const AdminUserManagement = () => {
   const { getAllUsers, createUser, setUserStatus, user: currentUser } = useAuth();
   const { toast } = useToast();
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
-  const [isClubDialogOpen, setIsClubDialogOpen] = useState(false);
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -47,13 +46,6 @@ const AdminUserManagement = () => {
   const [clubs, setClubs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  // Club creation form state
-  const [clubName, setClubName] = useState("");
-  const [clubAddress, setClubAddress] = useState("");
-  const [clubPhone, setClubPhone] = useState("");
-  const [clubEmail, setClubEmail] = useState("");
-  const [clubDescription, setClubDescription] = useState("");
   
   // Check user permissions
   const isSuperAdmin = currentUser?.role === 'super_admin';
@@ -80,12 +72,12 @@ const AdminUserManagement = () => {
           }
         }
         
-        // Fetch clubs
+        // Fetch clubs for the dropdown
         let fetchedClubs: any[] = [];
         try {
           const clubsResponse = await getAllClubs();
           fetchedClubs = Array.isArray(clubsResponse) ? clubsResponse : clubsResponse?.data || [];
-          console.log("Fetched clubs:", fetchedClubs);
+          console.log("Fetched clubs for dropdown:", fetchedClubs);
         } catch (clubError) {
           console.error("Error fetching clubs:", clubError);
           // Don't fail completely if clubs can't be fetched
@@ -108,61 +100,6 @@ const AdminUserManagement = () => {
     
     fetchData();
   }, [getAllUsers, toast]);
-  
-  const handleCreateClub = async () => {
-    if (!clubName || !clubAddress) {
-      toast({
-        title: "Error",
-        description: "Please fill in required fields (name and address)",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    try {
-      const clubData = {
-        name: clubName,
-        address: clubAddress,
-        phone: clubPhone || undefined,
-        email: clubEmail || undefined,
-        description: clubDescription || undefined
-      };
-      
-      console.log("Creating club with data:", clubData);
-      
-      const response = await createClub(clubData);
-      console.log("Club creation response:", response);
-      
-      // Refresh clubs list
-      try {
-        const updatedClubsResponse = await getAllClubs();
-        const updatedClubs = Array.isArray(updatedClubsResponse) ? updatedClubsResponse : updatedClubsResponse?.data || [];
-        setClubs(updatedClubs);
-      } catch (refreshError) {
-        console.error("Error refreshing clubs:", refreshError);
-      }
-      
-      toast({
-        title: "Success",
-        description: "Club created successfully",
-      });
-      
-      // Reset form
-      setClubName("");
-      setClubAddress("");
-      setClubPhone("");
-      setClubEmail("");
-      setClubDescription("");
-      setIsClubDialogOpen(false);
-    } catch (error: any) {
-      console.error("Error creating club:", error);
-      toast({
-        title: "Error",
-        description: error.message || "Failed to create club",
-        variant: "destructive"
-      });
-    }
-  };
 
   const handleCreateUser = async () => {
     if (!username || !email || !password) {
@@ -278,7 +215,7 @@ const AdminUserManagement = () => {
   console.log("Current user:", currentUser);
   console.log("All users:", users);
   console.log("Filtered users:", filteredUsers);
-  console.log("All clubs:", clubs);
+  console.log("Available clubs for selection:", clubs);
   
   if (error) {
     return (
@@ -300,220 +237,111 @@ const AdminUserManagement = () => {
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Users & Club Management</h3>
-        <div className="flex gap-2">
-          {isSuperAdmin && (
-            <Dialog open={isClubDialogOpen} onOpenChange={setIsClubDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Building className="h-4 w-4 mr-2" />
-                  Create Club
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Club</DialogTitle>
-                  <DialogDescription>
-                    Create a new snooker club in the system. Name and address are required fields.
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label htmlFor="clubName">Club Name *</Label>
-                    <Input
-                      id="clubName"
-                      value={clubName}
-                      onChange={(e) => setClubName(e.target.value)}
-                      placeholder="Enter club name"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="clubAddress">Address *</Label>
-                    <Input
-                      id="clubAddress"
-                      value={clubAddress}
-                      onChange={(e) => setClubAddress(e.target.value)}
-                      placeholder="Enter club address"
-                      required
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="clubPhone">Phone</Label>
-                    <Input
-                      id="clubPhone"
-                      value={clubPhone}
-                      onChange={(e) => setClubPhone(e.target.value)}
-                      placeholder="Enter phone number"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="clubEmail">Email</Label>
-                    <Input
-                      id="clubEmail"
-                      type="email"
-                      value={clubEmail}
-                      onChange={(e) => setClubEmail(e.target.value)}
-                      placeholder="Enter email"
-                    />
-                  </div>
-                  <div className="grid gap-2">
-                    <Label htmlFor="clubDescription">Description</Label>
-                    <Input
-                      id="clubDescription"
-                      value={clubDescription}
-                      onChange={(e) => setClubDescription(e.target.value)}
-                      placeholder="Enter description"
-                    />
-                  </div>
-                </div>
-                <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsClubDialogOpen(false)}>
-                    Cancel
-                  </Button>
-                  <Button onClick={handleCreateClub} disabled={!clubName || !clubAddress}>
-                    Create Club
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          )}
-          
-          <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add New User
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle>Create New User</DialogTitle>
-                <DialogDescription>
-                  Create a new user account with appropriate roles and club assignment.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
+        <h3 className="text-lg font-medium">User Management</h3>
+        <Dialog open={isUserDialogOpen} onOpenChange={setIsUserDialogOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <UserPlus className="h-4 w-4 mr-2" />
+              Add New User
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[500px]">
+            <DialogHeader>
+              <DialogTitle>Create New User</DialogTitle>
+              <DialogDescription>
+                Create a new user account with appropriate roles and club assignment.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid gap-2">
+                <Label htmlFor="username">Username *</Label>
+                <Input
+                  id="username"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Enter username"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter email"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="password">Password *</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter password"
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="role">Role *</Label>
+                <Select value={role} onValueChange={(value: "super_admin" | "sub_admin" | "manager") => setRole(value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
+                    {isSuperAdmin && <SelectItem value="sub_admin">Sub Admin (Club Owner)</SelectItem>}
+                    {(isSuperAdmin || isSubAdmin) && (
+                      <SelectItem value="manager">Manager</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              {(role === 'manager' || role === 'sub_admin') && (
                 <div className="grid gap-2">
-                  <Label htmlFor="username">Username *</Label>
-                  <Input
-                    id="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="Enter username"
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="Enter email"
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    required
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="role">Role *</Label>
-                  <Select value={role} onValueChange={(value: "super_admin" | "sub_admin" | "manager") => setRole(value)}>
+                  <Label htmlFor="club">Club {role === 'manager' ? '*' : ''}</Label>
+                  <Select 
+                    value={selectedClubId?.toString() || ""} 
+                    onValueChange={(value) => setSelectedClubId(value ? parseInt(value) : null)}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select role" />
+                      <SelectValue placeholder="Select club" />
                     </SelectTrigger>
                     <SelectContent>
-                      {isSuperAdmin && <SelectItem value="super_admin">Super Admin</SelectItem>}
-                      {isSuperAdmin && <SelectItem value="sub_admin">Sub Admin (Club Owner)</SelectItem>}
-                      {(isSuperAdmin || isSubAdmin) && (
-                        <SelectItem value="manager">Manager</SelectItem>
-                      )}
+                      {clubs.map((club) => (
+                        <SelectItem key={club.id} value={club.id.toString()}>
+                          {club.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  {role === 'manager' && !selectedClubId && (
+                    <p className="text-sm text-red-500">Club selection is required for managers</p>
+                  )}
                 </div>
-                
-                {(role === 'manager' || role === 'sub_admin') && (
-                  <div className="grid gap-2">
-                    <Label htmlFor="club">Club {role === 'manager' ? '*' : ''}</Label>
-                    <Select 
-                      value={selectedClubId?.toString() || ""} 
-                      onValueChange={(value) => setSelectedClubId(value ? parseInt(value) : null)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select club" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {clubs.map((club) => (
-                          <SelectItem key={club.id} value={club.id.toString()}>
-                            {club.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {role === 'manager' && !selectedClubId && (
-                      <p className="text-sm text-red-500">Club selection is required for managers</p>
-                    )}
-                  </div>
-                )}
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={handleCreateUser}
-                  disabled={!username || !email || !password || (role === 'manager' && !selectedClubId)}
-                >
-                  Create User
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsUserDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleCreateUser}
+                disabled={!username || !email || !password || (role === 'manager' && !selectedClubId)}
+              >
+                Create User
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
-      
-      {/* Clubs Section */}
-      {isSuperAdmin && clubs.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-md font-medium">Clubs</h4>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Name</TableHead>
-                <TableHead>Address</TableHead>
-                <TableHead>Phone</TableHead>
-                <TableHead>Email</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clubs.map((club) => (
-                <TableRow key={club.id}>
-                  <TableCell>{club.id}</TableCell>
-                  <TableCell className="font-medium">{club.name}</TableCell>
-                  <TableCell>{club.address}</TableCell>
-                  <TableCell>{club.phone || '-'}</TableCell>
-                  <TableCell>{club.email || '-'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      )}
       
       {/* Users Section */}
       <div className="space-y-2">
-        <h4 className="text-md font-medium">Users</h4>
         {isLoading ? (
           <div className="text-center py-4 text-muted-foreground">Loading users...</div>
         ) : filteredUsers.length > 0 ? (
