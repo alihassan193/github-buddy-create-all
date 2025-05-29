@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -40,11 +41,12 @@ const AdminUserManagement = () => {
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState<"super_admin" | "sub_admin" | "manager">("sub_admin");
+  const [role, setRole] = useState<"super_admin" | "sub_admin" | "manager">("manager");
   const [selectedClubId, setSelectedClubId] = useState<number | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [clubs, setClubs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   // Club creation form state
   const [clubName, setClubName] = useState("");
@@ -53,42 +55,59 @@ const AdminUserManagement = () => {
   const [clubEmail, setClubEmail] = useState("");
   const [clubDescription, setClubDescription] = useState("");
   
+  // Check user permissions
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const isSubAdmin = currentUser?.role === 'sub_admin';
+  
   // Fetch users and clubs when component mounts
   useEffect(() => {
     const fetchData = async () => {
-      if (getAllUsers) {
-        try {
-          setIsLoading(true);
-          console.log("Fetching users and clubs...");
-          const [fetchedUsers, fetchedClubs] = await Promise.all([
-            getAllUsers(),
-            getAllClubs()
-          ]);
-          console.log("Fetched users:", fetchedUsers);
-          console.log("Fetched clubs:", fetchedClubs);
-          setUsers(fetchedUsers || []);
-          setClubs(fetchedClubs || []);
-        } catch (error) {
-          console.error("Error fetching data:", error);
-          setUsers([]);
-          setClubs([]);
-          toast({
-            title: "Error",
-            description: "Failed to fetch data",
-            variant: "destructive"
-          });
-        } finally {
-          setIsLoading(false);
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        console.log("Fetching users and clubs...");
+        
+        // Fetch users if function exists
+        let fetchedUsers: User[] = [];
+        if (getAllUsers) {
+          try {
+            fetchedUsers = await getAllUsers();
+            console.log("Fetched users:", fetchedUsers);
+          } catch (userError) {
+            console.error("Error fetching users:", userError);
+            // Don't fail completely if users can't be fetched
+          }
         }
+        
+        // Fetch clubs
+        let fetchedClubs: any[] = [];
+        try {
+          const clubsResponse = await getAllClubs();
+          fetchedClubs = Array.isArray(clubsResponse) ? clubsResponse : clubsResponse?.data || [];
+          console.log("Fetched clubs:", fetchedClubs);
+        } catch (clubError) {
+          console.error("Error fetching clubs:", clubError);
+          // Don't fail completely if clubs can't be fetched
+        }
+        
+        setUsers(fetchedUsers);
+        setClubs(fetchedClubs);
+      } catch (error) {
+        console.error("Error in fetchData:", error);
+        setError("Failed to load data");
+        toast({
+          title: "Error",
+          description: "Failed to fetch data",
+          variant: "destructive"
+        });
+      } finally {
+        setIsLoading(false);
       }
     };
     
     fetchData();
   }, [getAllUsers, toast]);
-  
-  // Only super_admin can create other super_admins
-  const isSuperAdmin = currentUser?.role === 'super_admin';
-  const isSubAdmin = currentUser?.role === 'sub_admin';
   
   const handleCreateClub = async () => {
     if (!clubName || !clubAddress) {
@@ -115,8 +134,13 @@ const AdminUserManagement = () => {
       console.log("Club creation response:", response);
       
       // Refresh clubs list
-      const updatedClubs = await getAllClubs();
-      setClubs(updatedClubs || []);
+      try {
+        const updatedClubsResponse = await getAllClubs();
+        const updatedClubs = Array.isArray(updatedClubsResponse) ? updatedClubsResponse : updatedClubsResponse?.data || [];
+        setClubs(updatedClubs);
+      } catch (refreshError) {
+        console.error("Error refreshing clubs:", refreshError);
+      }
       
       toast({
         title: "Success",
@@ -169,11 +193,18 @@ const AdminUserManagement = () => {
         
         console.log("Creating user with data:", { username, email, role, selectedClubId });
         
+        // Use the selectedClubId as subAdminId parameter for the createUser function
         await createUser(username, email, password, role, selectedClubId || undefined);
         
         // Refresh the users list
-        const updatedUsers = await getAllUsers();
-        setUsers(updatedUsers || []);
+        if (getAllUsers) {
+          try {
+            const updatedUsers = await getAllUsers();
+            setUsers(updatedUsers || []);
+          } catch (refreshError) {
+            console.error("Error refreshing users:", refreshError);
+          }
+        }
         
         toast({
           title: "Success",
@@ -184,7 +215,7 @@ const AdminUserManagement = () => {
         setUsername("");
         setEmail("");
         setPassword("");
-        setRole("sub_admin");
+        setRole("manager");
         setSelectedClubId(null);
         setIsUserDialogOpen(false);
       }
@@ -199,28 +230,34 @@ const AdminUserManagement = () => {
   };
   
   const handleToggleUserStatus = async (userId: number) => {
-    if (setUserStatus) {
-      const user = users.find(u => u.id === userId);
-      if (user) {
+    if (!setUserStatus) return;
+    
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
+    
+    try {
+      await setUserStatus(userId, !user.is_active);
+      
+      // Refresh the users list
+      if (getAllUsers) {
         try {
-          await setUserStatus(userId, !user.is_active);
-          
-          // Refresh the users list
           const updatedUsers = await getAllUsers();
           setUsers(updatedUsers || []);
-          
-          toast({
-            title: "Success",
-            description: `User ${user.is_active ? "disabled" : "enabled"} successfully`,
-          });
-        } catch (error: any) {
-          toast({
-            title: "Error",
-            description: error.message || "Failed to update user status",
-            variant: "destructive"
-          });
+        } catch (refreshError) {
+          console.error("Error refreshing users:", refreshError);
         }
       }
+      
+      toast({
+        title: "Success",
+        description: `User ${user.is_active ? "disabled" : "enabled"} successfully`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update user status",
+        variant: "destructive"
+      });
     }
   };
 
@@ -242,6 +279,23 @@ const AdminUserManagement = () => {
   console.log("All users:", users);
   console.log("Filtered users:", filteredUsers);
   console.log("All clubs:", clubs);
+  
+  if (error) {
+    return (
+      <div className="space-y-4">
+        <div className="text-center py-4">
+          <p className="text-red-500">Error: {error}</p>
+          <Button 
+            onClick={() => window.location.reload()} 
+            variant="outline" 
+            className="mt-2"
+          >
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-4">
@@ -499,7 +553,6 @@ const AdminUserManagement = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => handleToggleUserStatus(user.id)}
-                      // Prevent users from disabling themselves
                       disabled={user.id === currentUser?.id}
                     >
                       {user.is_active ? "Disable" : "Enable"}
