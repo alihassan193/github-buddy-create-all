@@ -23,20 +23,18 @@ const Admin = () => {
   const isManager = user?.role === 'manager';
   
   // Determine which tabs to show based on role
-  const showUserManagement = isSuperAdmin || isSubAdmin; // Both can manage users, but super_admin sees all, sub_admin only sees their managers
-  const showClubManagement = isSuperAdmin; // Only super admins can manage clubs
-  const showTableManagement = isSuperAdmin || isSubAdmin; // Managers don't manage tables
-  const showCanteen = true; // Everyone can access canteen
-  const showInvoices = isSuperAdmin || isSubAdmin; // Only admins see all invoices
-  
-  const tabCount = [showTableManagement, showInvoices, showCanteen, showUserManagement, showClubManagement].filter(Boolean).length;
+  const showUserManagement = isSuperAdmin || isSubAdmin;
+  const showClubManagement = isSuperAdmin;
+  const showTableManagement = isSuperAdmin || isSubAdmin;
+  const showCanteen = true;
+  const showInvoices = isSuperAdmin || isSubAdmin;
   
   return (
     <div className="container mx-auto py-6 px-4">
       <h1 className="text-2xl font-bold mb-6">Admin Dashboard</h1>
       
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className={`grid grid-cols-${tabCount}`}>
+        <TabsList className="grid w-full grid-cols-5">
           {showTableManagement && <TabsTrigger value="tables">Tables Management</TabsTrigger>}
           {showInvoices && <TabsTrigger value="invoices">Invoices</TabsTrigger>}
           {showCanteen && <TabsTrigger value="canteen">Canteen Inventory</TabsTrigger>}
