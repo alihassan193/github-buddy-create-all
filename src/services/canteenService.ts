@@ -1,12 +1,27 @@
+
 import { apiClient } from './apiClient';
 
-// Get all canteen categories (keeping existing functionality)
+// Get all canteen categories - matches /api/canteen/categories endpoint
 export const getAllCategories = async (): Promise<any[]> => {
   try {
     const response = await apiClient.get('/api/canteen/categories');
     return response.data || response;
   } catch (error) {
     console.error('Error fetching categories:', error);
+    throw error;
+  }
+};
+
+// Create canteen category - matches /api/canteen/categories endpoint
+export const createCanteenCategory = async (categoryData: {
+  name: string;
+  description?: string;
+}): Promise<any> => {
+  try {
+    const response = await apiClient.post('/api/canteen/categories', categoryData);
+    return response.data || response;
+  } catch (error) {
+    console.error('Error creating category:', error);
     throw error;
   }
 };

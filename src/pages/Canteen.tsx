@@ -1,320 +1,254 @@
 
-import { useState } from "react";
-import { useData } from "@/context/DataContext";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { CanteenItem, TableSession } from "@/types";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ShoppingCart, Minus, Plus } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Coffee, Package, ShoppingCart, AlertTriangle } from "lucide-react";
+import { getAllCanteenItems, getLowStockItems, updateStock } from "@/services/canteenService";
 
 const Canteen = () => {
-  const { 
-    canteenCategories, 
-    canteenItems, 
-    activeSessions,
-    cart,
-    addToCart,
-    removeFromCart,
-    clearCart,
-    placeOrder
-  } = useData();
+  const { user } = useAuth();
   const { toast } = useToast();
-  const [search, setSearch] = useState("");
-  const [selectedTab, setSelectedTab] = useState("all");
-  const [showCartDialog, setShowCartDialog] = useState(false);
-  const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
-  
-  // Get all items with their category names
-  const itemsWithCategories = canteenItems.map(item => ({
-    ...item,
-    category_name: canteenCategories.find(c => c.id === item.category_id)?.name || 'Uncategorized'
-  }));
-  
-  // Filter items by search term and/or category
-  const filteredItems = itemsWithCategories.filter(item => {
-    const matchesSearch = search ? 
-      item.name.toLowerCase().includes(search.toLowerCase()) : true;
-    
-    const matchesCategory = selectedTab !== "all" ? 
-      item.category_id === parseInt(selectedTab) : true;
-    
-    return matchesSearch && matchesCategory;
-  });
-  
-  // Calculate cart total
-  const cartTotal = cart.reduce(
-    (total, cartItem) => total + (cartItem.item.price * cartItem.quantity), 
-    0
+  const [canteenItems, setCanteenItems] = useState<any[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    if (user?.permissions?.can_manage_canteen) {
+      fetchCanteenData();
+    }
+  }, [user]);
+
+  const fetchCanteenData = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Fetch all canteen items
+      const itemsResponse = await getAllCanteenItems();
+      const items = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse?.data || [];
+      setCanteenItems(items);
+
+      // Fetch low stock items
+      const lowStock = await getLowStockItems();
+      setLowStockItems(Array.isArray(lowStock) ? lowStock : lowStock?.data || []);
+    } catch (error) {
+      console.error("Error fetching canteen data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch canteen data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleStockUpdate = async (itemId: number, operation: 'add' | 'subtract', quantity: number = 1) => {
+    try {
+      await updateStock(itemId, { quantity, operation });
+      toast({
+        title: "Success",
+        description: "Stock updated successfully"
+      });
+      fetchCanteenData(); // Refresh data
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to update stock",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const filteredItems = canteenItems.filter(item =>
+    item.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    item.description?.toLowerCase().includes(searchTerm.toLowerCase())
   );
-  
-  const handleAddToCart = (item: CanteenItem) => {
-    if (item.stock_quantity <= 0) {
-      toast({
-        title: "Out of Stock",
-        description: `${item.name} is currently out of stock`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    addToCart(item, 1);
-    toast({
-      title: "Added to cart",
-      description: `${item.name} has been added to your cart`,
-    });
-  };
-  
-  const handleRemoveFromCart = (itemId: number, name: string) => {
-    removeFromCart(itemId);
-    toast({
-      title: "Removed from cart",
-      description: `${name} has been removed from your cart`,
-    });
-  };
-  
-  const handleAdjustQuantity = (item: CanteenItem, change: number) => {
-    const cartItem = cart.find(i => i.item.id === item.id);
-    const currentQuantity = cartItem ? cartItem.quantity : 0;
-    const newQuantity = currentQuantity + change;
-    
-    if (newQuantity <= 0) {
-      handleRemoveFromCart(item.id, item.name);
-      return;
-    }
-    
-    if (newQuantity > item.stock_quantity) {
-      toast({
-        title: "Limited Stock",
-        description: `Only ${item.stock_quantity} available`,
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    addToCart(item, change);
-  };
-  
-  const handlePlaceOrder = () => {
-    if (cart.length === 0) {
-      toast({
-        title: "Empty Cart",
-        description: "Add items to your cart first",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    placeOrder(1, selectedSessionId || undefined); // 1 is the user ID, should be dynamic
-    
-    toast({
-      title: "Order Placed",
-      description: `Order total: $${cartTotal.toFixed(2)}`,
-    });
-    
-    setShowCartDialog(false);
-    setSelectedSessionId(null);
-  };
-  
-  return (
-    <div className="container mx-auto py-6 px-4">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-        <h1 className="text-2xl font-bold">Canteen</h1>
-        <div className="flex items-center gap-4 w-full md:w-auto">
-          <Input
-            placeholder="Search items..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full md:w-64"
-          />
-          <Button 
-            className="flex items-center gap-2"
-            onClick={() => setShowCartDialog(true)}
-            disabled={cart.length === 0}
-          >
-            <ShoppingCart className="h-4 w-4" />
-            <span>{cart.length}</span>
-          </Button>
+
+  if (!user?.permissions?.can_manage_canteen) {
+    return (
+      <div className="container mx-auto py-6 px-4">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
+          <p className="text-gray-600 mt-2">You don't have permission to access the canteen.</p>
         </div>
       </div>
-      
-      <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-4">
-        <TabsList className="mb-4 overflow-auto">
-          <TabsTrigger value="all">All Items</TabsTrigger>
-          {canteenCategories.map(category => (
-            <TabsTrigger key={category.id} value={category.id.toString()}>
-              {category.name}
-            </TabsTrigger>
-          ))}
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto py-6 px-4">
+        <div className="text-center">
+          <p>Loading canteen data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto py-6 px-4">
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h1 className="text-3xl font-bold">Canteen Management</h1>
+          <p className="text-muted-foreground">
+            Manage inventory and sales
+          </p>
+        </div>
+        <Badge variant="outline" className="bg-orange-50">
+          {lowStockItems.length} Low Stock Alerts
+        </Badge>
+      </div>
+
+      <Tabs defaultValue="inventory" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="inventory">Inventory</TabsTrigger>
+          <TabsTrigger value="low-stock">Low Stock</TabsTrigger>
         </TabsList>
-        
-        {filteredItems.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-            {filteredItems.map((item) => (
-              <ProductCard 
-                key={item.id} 
-                product={item} 
-                onAddToCart={handleAddToCart} 
-                cartItem={cart.find(i => i.item.id === item.id)}
-                onAdjustQuantity={handleAdjustQuantity}
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="text-center py-8 text-gray-500">No items found matching your criteria.</p>
-        )}
-      </Tabs>
-      
-      <Dialog open={showCartDialog} onOpenChange={setShowCartDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Your Cart</DialogTitle>
-            <DialogDescription>
-              Review your items before placing an order
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            {cart.length > 0 ? (
-              <>
-                <div className="space-y-2">
-                  {cart.map(cartItem => (
-                    <div key={cartItem.item.id} className="flex justify-between items-center border-b pb-2">
+
+        <TabsContent value="inventory">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Inventory Management
+              </CardTitle>
+              <CardDescription>
+                View and manage your canteen inventory
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-4">
+                <Input
+                  placeholder="Search items..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="max-w-sm"
+                />
+              </div>
+
+              {filteredItems.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {filteredItems.map((item) => (
+                    <Card key={item.id} className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h3 className="font-medium">{item.name}</h3>
+                          <Badge variant={item.is_available ? "default" : "secondary"}>
+                            {item.is_available ? "Available" : "Unavailable"}
+                          </Badge>
+                        </div>
+                        
+                        {item.description && (
+                          <p className="text-sm text-muted-foreground mb-2">
+                            {item.description}
+                          </p>
+                        )}
+                        
+                        <div className="space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-sm">Price:</span>
+                            <span className="font-medium">${item.price?.toFixed(2) || '0.00'}</span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm">Stock:</span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleStockUpdate(item.id, 'subtract')}
+                                disabled={item.stock_quantity <= 0}
+                              >
+                                -
+                              </Button>
+                              <Badge 
+                                variant={
+                                  item.stock_quantity > (item.minimum_stock || 10) ? "default" :
+                                  item.stock_quantity > 0 ? "secondary" : "destructive"
+                                }
+                              >
+                                {item.stock_quantity || 0}
+                              </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleStockUpdate(item.id, 'add')}
+                              >
+                                +
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Coffee className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                  <p className="text-muted-foreground">
+                    {searchTerm ? "No items found matching your search" : "No canteen items found"}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="low-stock">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-orange-500" />
+                Low Stock Alerts
+              </CardTitle>
+              <CardDescription>
+                Items that need restocking
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {lowStockItems.length > 0 ? (
+                <div className="space-y-3">
+                  {lowStockItems.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center p-4 bg-orange-50 rounded-lg border-l-4 border-l-orange-500">
                       <div>
-                        <p className="font-medium">{cartItem.item.name}</p>
-                        <p className="text-sm text-gray-500">${cartItem.item.price.toFixed(2)} × {cartItem.quantity}</p>
+                        <h3 className="font-medium">{item.name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Current: {item.stock_quantity} | Minimum: {item.minimum_stock || 10}
+                        </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleAdjustQuantity(cartItem.item, -1)}
+                        <Badge variant="destructive">
+                          {item.stock_quantity} left
+                        </Badge>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStockUpdate(item.id, 'add', 10)}
                         >
-                          <Minus className="h-3 w-3" />
-                        </Button>
-                        <span>{cartItem.quantity}</span>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          onClick={() => handleAdjustQuantity(cartItem.item, 1)}
-                        >
-                          <Plus className="h-3 w-3" />
+                          +10
                         </Button>
                       </div>
                     </div>
                   ))}
                 </div>
-                <div className="border-t pt-2">
-                  <div className="flex justify-between font-bold">
-                    <span>Total:</span>
-                    <span>${cartTotal.toFixed(2)}</span>
-                  </div>
+              ) : (
+                <div className="text-center py-8">
+                  <Package className="h-12 w-12 mx-auto mb-4 text-green-400" />
+                  <p className="text-muted-foreground">All items are well stocked!</p>
                 </div>
-                {activeSessions.length > 0 && (
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Assign to table (optional):</label>
-                    <Select onValueChange={(value) => setSelectedSessionId(Number(value) || null)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a table (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Guest Order</SelectItem>
-                        {activeSessions.map(session => {
-                          return (
-                            <SelectItem key={session.id} value={session.id.toString()}>
-                              {`${session.player_name} - Table #${session.table_id}`}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </>
-            ) : (
-              <p className="text-center py-4">Your cart is empty</p>
-            )}
-          </div>
-          <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => clearCart()} disabled={cart.length === 0}>
-              Clear
-            </Button>
-            <Button onClick={handlePlaceOrder} disabled={cart.length === 0}>
-              Place Order
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
-  );
-};
-
-interface ProductCardProps {
-  product: CanteenItem & { category_name?: string };
-  cartItem?: { item: CanteenItem; quantity: number };
-  onAddToCart: (product: CanteenItem) => void;
-  onAdjustQuantity: (product: CanteenItem, change: number) => void;
-}
-
-const ProductCard = ({ product, cartItem, onAddToCart, onAdjustQuantity }: ProductCardProps) => {
-  const inCart = cartItem !== undefined;
-  const quantity = cartItem?.quantity || 0;
-  
-  return (
-    <Card className="overflow-hidden">
-      <CardHeader className="pb-2">
-        <CardTitle>{product.name}</CardTitle>
-        <CardDescription>${product.price.toFixed(2)}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <div className={`h-12 w-full rounded-md ${
-          product.category_name?.toLowerCase() === 'beverages' ? 'bg-blue-100' : 
-          product.category_name?.toLowerCase() === 'snacks' ? 'bg-amber-100' : 
-          product.category_name?.toLowerCase() === 'food' ? 'bg-green-100' :
-          'bg-gray-100'
-        } flex items-center justify-center`}>
-          <span className="capitalize">{product.category_name}</span>
-        </div>
-        <div className="mt-2">
-          <span className={`text-sm ${product.stock_quantity > 10 ? 'text-green-600' : product.stock_quantity > 0 ? 'text-amber-600' : 'text-red-600'}`}>
-            {product.stock_quantity > 10 ? 'In Stock' : product.stock_quantity > 0 ? `Low Stock: ${product.stock_quantity} left` : 'Out of Stock'}
-          </span>
-        </div>
-      </CardContent>
-      <CardFooter>
-        {inCart ? (
-          <div className="flex w-full items-center justify-between">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => onAdjustQuantity(product, -1)}
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <span className="mx-2 min-w-8 text-center">{quantity}</span>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={() => onAdjustQuantity(product, 1)}
-              disabled={product.stock_quantity <= quantity}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <Button 
-            onClick={() => onAddToCart(product)} 
-            disabled={product.stock_quantity === 0}
-            className="w-full"
-          >
-            Add to Cart
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
   );
 };
 

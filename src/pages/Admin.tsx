@@ -13,8 +13,9 @@ const Admin = () => {
   
   const isSuperAdmin = user?.role === 'super_admin';
   const isSubAdmin = user?.role === 'sub_admin';
+  const isAdmin = isSuperAdmin || isSubAdmin;
   
-  if (!isSuperAdmin && !isSubAdmin) {
+  if (!isAdmin) {
     return (
       <div className="container mx-auto py-6 px-4">
         <div className="text-center">
@@ -34,19 +35,21 @@ const Admin = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="clubs" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="clubs" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Clubs
+      <Tabs defaultValue={isSuperAdmin ? "clubs" : "users"} className="space-y-6">
+        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          {isSuperAdmin && (
+            <TabsTrigger value="clubs" className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              Clubs
+            </TabsTrigger>
+          )}
+          <TabsTrigger value="users" className="flex items-center gap-2">
+            <Users className="h-4 w-4" />
+            Users
           </TabsTrigger>
           <TabsTrigger value="tables" className="flex items-center gap-2">
             <Table className="h-4 w-4" />
             Tables
-          </TabsTrigger>
-          <TabsTrigger value="users" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Users
           </TabsTrigger>
           <TabsTrigger value="canteen" className="flex items-center gap-2">
             <Coffee className="h-4 w-4" />
@@ -54,16 +57,32 @@ const Admin = () => {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="clubs">
+        {isSuperAdmin && (
+          <TabsContent value="clubs">
+            <Card>
+              <CardHeader>
+                <CardTitle>Club Management</CardTitle>
+                <CardDescription>
+                  Manage clubs and assign managers to them.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AdminClubManagement />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
+
+        <TabsContent value="users">
           <Card>
             <CardHeader>
-              <CardTitle>Club Management</CardTitle>
+              <CardTitle>User Management</CardTitle>
               <CardDescription>
-                Manage clubs and assign managers to them.
+                Manage administrators and managers in the system.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <AdminClubManagement />
+              <AdminUserManagement />
             </CardContent>
           </Card>
         </TabsContent>
@@ -78,20 +97,6 @@ const Admin = () => {
             </CardHeader>
             <CardContent>
               <AdminTableList />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>User Management</CardTitle>
-              <CardDescription>
-                Manage administrators and managers in the system.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <AdminUserManagement />
             </CardContent>
           </Card>
         </TabsContent>
