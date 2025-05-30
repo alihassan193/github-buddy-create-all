@@ -33,9 +33,10 @@ const Canteen = () => {
       const items = Array.isArray(itemsResponse) ? itemsResponse : itemsResponse?.data || [];
       setCanteenItems(items);
 
-      // Fetch low stock items
-      const lowStock = await getLowStockItems();
-      setLowStockItems(Array.isArray(lowStock) ? lowStock : lowStock?.data || []);
+      // Fetch low stock items - fix the type issue
+      const lowStockResponse = await getLowStockItems();
+      const lowStock = Array.isArray(lowStockResponse) ? lowStockResponse : (lowStockResponse as any)?.data || [];
+      setLowStockItems(lowStock);
     } catch (error) {
       console.error("Error fetching canteen data:", error);
       toast({
