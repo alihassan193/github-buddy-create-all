@@ -1,3 +1,4 @@
+
 // Update API_BASE_URL to your actual API URL - modify this if needed
 const API_BASE_URL = "http://localhost:5000";
 
@@ -9,7 +10,7 @@ export const apiClient = {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "x-access-token": token }),
+        ...(token && { "Authorization": `Bearer ${token}` }),
       },
     });
 
@@ -23,7 +24,7 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({}));
+      const error = await response.json().catch(() => ({ message: "An error occurred while fetching data" }));
       throw new Error(error.message || "An error occurred while fetching data");
     }
 
@@ -37,7 +38,7 @@ export const apiClient = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "x-access-token": token }),
+        ...(token && { "Authorization": `Bearer ${token}` }),
       },
       body: JSON.stringify(data),
     });
@@ -52,10 +53,8 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({}));
-      throw new Error(
-        error.message || "An error occurred while submitting data"
-      );
+      const error = await response.json().catch(() => ({ message: "An error occurred while submitting data" }));
+      throw new Error(error.message || "An error occurred while submitting data");
     }
 
     return response.json();
@@ -68,7 +67,7 @@ export const apiClient = {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "x-access-token": token }),
+        ...(token && { "Authorization": `Bearer ${token}` }),
       },
       body: JSON.stringify(data),
     });
@@ -83,7 +82,7 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({}));
+      const error = await response.json().catch(() => ({ message: "An error occurred while updating data" }));
       throw new Error(error.message || "An error occurred while updating data");
     }
 
@@ -97,7 +96,7 @@ export const apiClient = {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "x-access-token": token }),
+        ...(token && { "Authorization": `Bearer ${token}` }),
       },
     });
 
@@ -111,7 +110,7 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({}));
+      const error = await response.json().catch(() => ({ message: "An error occurred while deleting data" }));
       throw new Error(error.message || "An error occurred while deleting data");
     }
 
@@ -146,8 +145,8 @@ async function refreshAccessToken(): Promise<boolean> {
     }
 
     const data = await response.json();
-    if (data.accessToken) {
-      localStorage.setItem("accessToken", data.accessToken);
+    if (data.success && data.data?.accessToken) {
+      localStorage.setItem("accessToken", data.data.accessToken);
       return true;
     }
 

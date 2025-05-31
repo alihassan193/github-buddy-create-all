@@ -2,28 +2,32 @@
 import { User, UserPermissions } from '../types';
 import { apiClient } from './apiClient';
 
-// Login user - updated to match backend signin endpoint
+// Login user - updated to match backend signin endpoint (using username)
 export const login = async (email: string, password: string): Promise<any> => {
   try {
-    const result = await apiClient.post('/api/auth/signin', { email, password });
+    // Your API uses username for login, but we'll treat email as username for now
+    const result = await apiClient.post('/api/auth/signin', { username: email, password });
     
-    // The backend returns { success: true, message: "...", data: { user, accessToken, refreshToken } }
-    const responseData = result.data || result;
-    
-    if (responseData.accessToken) {
-      localStorage.setItem('accessToken', responseData.accessToken);
+    if (result.success && result.data) {
+      const responseData = result.data;
+      
+      if (responseData.accessToken) {
+        localStorage.setItem('accessToken', responseData.accessToken);
+      }
+      
+      if (responseData.refreshToken) {
+        localStorage.setItem('refreshToken', responseData.refreshToken);
+      }
+      
+      // Store the complete user data from backend response
+      if (responseData.user) {
+        localStorage.setItem('userData', JSON.stringify(responseData.user));
+      }
+      
+      return responseData;
     }
     
-    if (responseData.refreshToken) {
-      localStorage.setItem('refreshToken', responseData.refreshToken);
-    }
-    
-    // Store the complete user data from backend response
-    if (responseData.user) {
-      localStorage.setItem('userData', JSON.stringify(responseData.user));
-    }
-    
-    return responseData;
+    throw new Error(result.message || 'Login failed');
   } catch (error: any) {
     console.error('Login error:', error);
     throw new Error(error.message || 'Invalid credentials');
@@ -48,7 +52,12 @@ export const register = async (
     };
     
     const result = await apiClient.post('/api/auth/signup', userData);
-    return result;
+    
+    if (result.success) {
+      return result;
+    }
+    
+    throw new Error(result.message || 'Registration failed');
   } catch (error: any) {
     console.error('Registration error:', error);
     throw new Error(error.message || 'Registration failed');
@@ -66,9 +75,9 @@ export const refreshToken = async (): Promise<string | null> => {
   try {
     const response = await apiClient.post('/api/auth/refresh-token', { refreshToken });
     
-    if (response.accessToken) {
-      localStorage.setItem('accessToken', response.accessToken);
-      return response.accessToken;
+    if (response.success && response.data?.accessToken) {
+      localStorage.setItem('accessToken', response.data.accessToken);
+      return response.data.accessToken;
     }
     
     return null;
@@ -83,8 +92,8 @@ export const refreshToken = async (): Promise<string | null> => {
 // Logout user - matches backend endpoint
 export const logout = async (): Promise<void> => {
   try {
-    // Call backend logout endpoint - note the endpoint is signout in the API
-    await apiClient.post('/api/auth/signout', {});
+    // Your API doesn't have a logout endpoint, so we'll just clear local storage
+    console.log('Logging out user');
   } catch (error) {
     console.error('Logout error:', error);
   } finally {
@@ -95,24 +104,27 @@ export const logout = async (): Promise<void> => {
   }
 };
 
-// Get current user profile - new endpoint from backend
+// Get current user profile - matches backend endpoint
 export const getUserProfile = async (): Promise<any> => {
   try {
-    const userData = await apiClient.get('/api/auth/me');
-    return userData;
+    const response = await apiClient.get('/api/auth/me');
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to get user profile');
   } catch (error) {
     console.error('Error fetching user profile:', error);
     throw error;
   }
 };
 
-// Change password - new endpoint from backend
+// Change password - placeholder (not in your API docs)
 export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
   try {
-    await apiClient.put('/api/auth/change-password', {
-      currentPassword,
-      newPassword
-    });
+    // This endpoint is not in your API docs, so it's a placeholder
+    throw new Error('Change password functionality not implemented in backend');
   } catch (error) {
     console.error('Error changing password:', error);
     throw error;
@@ -120,25 +132,18 @@ export const changePassword = async (currentPassword: string, newPassword: strin
 };
 
 // Map database user to app user - updated to handle new backend structure
-export const mapDatabaseUserToAppUser = (userData: any, permissions: UserPermissions | null): User | null => {
+export const mapDatabaseUserToAppUser = (userData: any, permissions?: UserPermissions | null): User | null => {
   if (!userData) return null;
 
   // Handle permissions from the backend structure
   let mappedPermissions: UserPermissions;
   
-  if (userData.permission) {
-    // If permissions come from the Permission association
+  if (userData.permissions) {
+    // If permissions come from the API response
     mappedPermissions = {
-      can_manage_tables: userData.permission.can_manage_tables === 1 || userData.permission.can_manage_tables === true,
-      can_manage_canteen: userData.permission.can_manage_canteen === 1 || userData.permission.can_manage_canteen === true,
-      can_view_reports: userData.permission.can_view_reports === 1 || userData.permission.can_view_reports === true,
-    };
-  } else if (userData.Permission) {
-    // Alternative permission structure
-    mappedPermissions = {
-      can_manage_tables: userData.Permission.can_manage_tables === 1 || userData.Permission.can_manage_tables === true,
-      can_manage_canteen: userData.Permission.can_manage_canteen === 1 || userData.Permission.can_manage_canteen === true,
-      can_view_reports: userData.Permission.can_view_reports === 1 || userData.Permission.can_view_reports === true,
+      can_manage_tables: userData.permissions.can_manage_tables === 1 || userData.permissions.can_manage_tables === true,
+      can_manage_canteen: userData.permissions.can_manage_canteen === 1 || userData.permissions.can_manage_canteen === true,
+      can_view_reports: userData.permissions.can_view_reports === 1 || userData.permissions.can_view_reports === true,
     };
   } else if (permissions) {
     // Use provided permissions
@@ -163,7 +168,7 @@ export const mapDatabaseUserToAppUser = (userData: any, permissions: UserPermiss
     role: userData.role,
     is_active: userData.is_active === 1 || userData.is_active === true,
     sub_admin_id: userData.sub_admin_id,
-    club_id: userData.club_id, // Added club_id support
+    club_id: userData.club_id,
     permissions: mappedPermissions
   };
 };

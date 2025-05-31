@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 const LoginForm = () => {
   const { login } = useAuth();
   const { toast } = useToast();
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -19,7 +19,7 @@ const LoginForm = () => {
     setIsLoading(true);
     
     try {
-      await login(email, password);
+      await login(username, password);
       toast({
         title: "Login successful",
         description: "Welcome back!",
@@ -47,14 +47,14 @@ const LoginForm = () => {
       <form onSubmit={handleSubmit}>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
+            <Label htmlFor="username">Username</Label>
             <Input
-              id="email"
-              type="email"
-              placeholder="admin@example.com"
+              id="username"
+              type="text"
+              placeholder="Enter your username"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -72,8 +72,8 @@ const LoginForm = () => {
           <div className="text-sm text-muted-foreground">
             Demo accounts:
             <ul className="list-disc pl-5 mt-1">
-              <li>Admin: admin@example.com / Password123!</li>
-              <li>Manager: manager@example.com / Password123!</li>
+              <li>Username: admin / Password: password123</li>
+              <li>Username: manager / Password: password123</li>
             </ul>
           </div>
         </CardContent>

@@ -3,39 +3,36 @@ import { User, UserPermissions } from "../types";
 import { apiClient } from "./apiClient";
 import { mapDatabaseUserToAppUser } from "./authService";
 
-// Get all users - matches /api/admin/users endpoint with pagination
+// Get all users - matches /api/admin/users endpoint
 export const getAllUsers = async (page: number = 1, limit: number = 10): Promise<{ users: User[], total: number, page: number, totalPages: number }> => {
   try {
     const response = await apiClient.get(`/api/admin/users?page=${page}&limit=${limit}`);
     
     console.log("API Response - All Users:", response);
     
-    // The API returns users with permission objects included
-    const allUsers = Array.isArray(response.users) 
-      ? response.users.map((user: any) => {
-          // Extract permissions from the included Permission object
-          const permissions = user.Permission ? {
-            can_manage_tables: user.Permission.can_manage_tables === 1,
-            can_manage_canteen: user.Permission.can_manage_canteen === 1,
-            can_view_reports: user.Permission.can_view_reports === 1
-          } : {
-            // Fallback permissions based on role if Permission object is missing
-            can_manage_tables: user.role === 'super_admin' || user.role === 'sub_admin',
-            can_manage_canteen: true,
-            can_view_reports: user.role === 'super_admin' || user.role === 'sub_admin' || user.role === 'manager'
-          };
-          
-          return mapDatabaseUserToAppUser(user, permissions);
-        })
-      : [];
+    if (response.success && response.data) {
+      const users = Array.isArray(response.data) ? response.data : [];
       
-    console.log("Mapped Users:", allUsers);
-    return {
-      users: allUsers.filter(Boolean) as User[],
-      total: response.total || 0,
-      page: response.page || 1,
-      totalPages: response.totalPages || 1
-    };
+      const mappedUsers = users.map((user: any) => {
+        const permissions = user.permissions || {
+          can_manage_tables: user.role === 'super_admin' || user.role === 'sub_admin',
+          can_manage_canteen: true,
+          can_view_reports: user.role === 'super_admin' || user.role === 'sub_admin' || user.role === 'manager'
+        };
+        
+        return mapDatabaseUserToAppUser(user, permissions);
+      }).filter(Boolean) as User[];
+      
+      console.log("Mapped Users:", mappedUsers);
+      return {
+        users: mappedUsers,
+        total: response.pagination?.total || mappedUsers.length,
+        page: response.pagination?.page || page,
+        totalPages: response.pagination?.totalPages || Math.ceil(mappedUsers.length / limit)
+      };
+    }
+    
+    throw new Error(response.message || 'Failed to fetch users');
   } catch (error) {
     console.error("Error fetching users:", error);
     throw error;
@@ -64,7 +61,11 @@ export const createSubAdmin = async (
       ...permissions
     });
     
-    return userData;
+    if (userData.success) {
+      return userData;
+    }
+    
+    throw new Error(userData.message || 'Failed to create sub-admin');
   } catch (error) {
     console.error('Error creating sub-admin:', error);
     throw error;
@@ -94,7 +95,11 @@ export const createManager = async (
       can_view_reports: permissions?.can_view_reports ?? true
     });
     
-    return userData;
+    if (userData.success) {
+      return userData;
+    }
+    
+    throw new Error(userData.message || 'Failed to create manager');
   } catch (error) {
     console.error('Error creating manager:', error);
     throw error;
@@ -131,7 +136,12 @@ export const createUser = async (
 export const getManagedClubs = async (): Promise<any[]> => {
   try {
     const response = await apiClient.get("/api/admin/managed-clubs");
-    return response.clubs || response;
+    
+    if (response.success) {
+      return response.data || [];
+    }
+    
+    throw new Error(response.message || 'Failed to fetch managed clubs');
   } catch (error) {
     console.error("Error fetching managed clubs:", error);
     throw error;
@@ -141,38 +151,68 @@ export const getManagedClubs = async (): Promise<any[]> => {
 // Set user active status - matches /api/admin/users/:id endpoint
 export const setUserStatus = async (userId: number, isActive: boolean): Promise<void> => {
   try {
-    await apiClient.put(`/api/admin/users/${userId}`, { 
+    const response = await apiClient.put(`/api/admin/users/${userId}`, { 
       is_active: isActive 
     });
+    
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to update user status');
+    }
   } catch (error) {
     console.error('Error updating user status:', error);
     throw error;
   }
 };
 
-// Legacy function for backward compatibility
+// Get all admins - matches /api/admin/admins endpoint
 export const getAllAdmins = async (): Promise<User[]> => {
   try {
-    const response = await getAllUsers(1, 100); // Get first 100 users
-    return response.users.filter(user => user.role === 'sub_admin' || user.role === 'super_admin');
+    const response = await apiClient.get('/api/admin/admins');
+    
+    if (response.success && response.data) {
+      const admins = Array.isArray(response.data) ? response.data : [];
+      
+      return admins.map((admin: any) => {
+        const permissions = admin.permissions || {
+          can_manage_tables: admin.role === 'super_admin' || admin.role === 'sub_admin',
+          can_manage_canteen: true,
+          can_view_reports: true
+        };
+        
+        return mapDatabaseUserToAppUser(admin, permissions);
+      }).filter(Boolean) as User[];
+    }
+    
+    throw new Error(response.message || 'Failed to fetch admins');
   } catch (error) {
     console.error("Error fetching admins:", error);
     return [];
   }
 };
 
-// Get user by ID
+// Get user by ID - matches /api/admin/admins/:id endpoint
 export const getUserById = async (userId: number): Promise<User | null> => {
   try {
-    const response = await getAllUsers(1, 1000); // Get all users and find the one
-    return response.users.find(user => user.id === userId) || null;
+    const response = await apiClient.get(`/api/admin/admins/${userId}`);
+    
+    if (response.success && response.data) {
+      const permissions = response.data.permissions || {
+        can_manage_tables: response.data.role === 'super_admin' || response.data.role === 'sub_admin',
+        can_manage_canteen: true,
+        can_view_reports: true
+      };
+      
+      return mapDatabaseUserToAppUser(response.data, permissions);
+    }
+    
+    throw new Error(response.message || 'User not found');
   } catch (error) {
     console.error('Error fetching user details:', error);
     return null;
   }
 };
 
-// Update admin/manager
+// Update admin/manager - matches /api/admin/admins/:id endpoint
 export const updateAdmin = async (
   adminId: number, 
   adminData: {
@@ -182,20 +222,29 @@ export const updateAdmin = async (
     can_manage_tables?: boolean;
     can_manage_canteen?: boolean;
     can_view_reports?: boolean;
+    club_ids?: number[];
   }
 ): Promise<void> => {
   try {
-    await apiClient.put(`/api/admin/users/${adminId}`, adminData);
+    const response = await apiClient.put(`/api/admin/admins/${adminId}`, adminData);
+    
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to update admin');
+    }
   } catch (error) {
     console.error('Error updating admin:', error);
     throw error;
   }
 };
 
-// Delete admin/manager
+// Delete admin/manager - matches /api/admin/admins/:id endpoint
 export const deleteAdmin = async (adminId: number): Promise<void> => {
   try {
-    await apiClient.delete(`/api/admin/users/${adminId}`);
+    const response = await apiClient.delete(`/api/admin/admins/${adminId}`);
+    
+    if (!response.success) {
+      throw new Error(response.message || 'Failed to delete admin');
+    }
   } catch (error) {
     console.error('Error deleting admin:', error);
     throw error;
