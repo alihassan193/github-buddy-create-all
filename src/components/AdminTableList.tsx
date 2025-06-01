@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useData } from "@/context/DataContext";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -20,8 +19,7 @@ const AdminTableList = () => {
   const [pricingDialogOpen, setPricingDialogOpen] = useState(false);
   const [selectedTable, setSelectedTable] = useState<SnookerTable | null>(null);
   const [newTable, setNewTable] = useState<Partial<SnookerTable>>({
-    table_number: "",
-    status: "available"
+    table_number: ""
   });
   const [pricings, setPricings] = useState<Partial<GamePricing>[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -37,8 +35,7 @@ const AdminTableList = () => {
   const handleOpenNewDialog = () => {
     setSelectedTable(null);
     setNewTable({
-      table_number: "",
-      status: "available"
+      table_number: ""
     });
     setDialogOpen(true);
   };
@@ -99,7 +96,7 @@ const AdminTableList = () => {
     try {
       await createTable({
         table_number: tableNumber,
-        status: newTable.status || "available"
+        table_type: 'standard'
       });
       
       await refreshTables();
