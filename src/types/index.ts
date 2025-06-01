@@ -19,7 +19,7 @@ export interface UserPermissions {
 export interface SnookerTable {
   id: number;
   table_number: string;
-  status: 'available' | 'occupied' | 'maintenance';
+  status: 'available' | 'occupied' | 'maintenance' | 'reserved';
   created_by: number;
   created_at: string;
   name?: string; // Added for display purposes
