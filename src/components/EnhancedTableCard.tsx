@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { SnookerTable, GameType } from "@/types";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
-import { Play, Clock, User, Settings, Coffee } from "lucide-react";
+import { startSession, endSession } from "@/services/sessionService";
+import { Play, Clock, User, Settings, Coffee, ShoppingCart, Stop } from "lucide-react";
 
 interface EnhancedTableCardProps {
   table: SnookerTable;
@@ -18,11 +19,14 @@ interface EnhancedTableCardProps {
 }
 
 const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProps) => {
-  const { gameTypes, gamePricings, startSession } = useData();
+  const { gameTypes, gamePricings, refreshTables } = useData();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [gameTypeId, setGameTypeId] = useState<number | null>(null);
   const [playerName, setPlayerName] = useState('');
+  const [sessionDuration, setSessionDuration] = useState(0);
+  const [isStarting, setIsStarting] = useState(false);
+  const [isEnding, setIsEnding] = useState(false);
   
   // Find active session for this table
   const activeSession = activeSessions.find(session => session.table_id === table.id);
@@ -30,7 +34,25 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProp
   // Filter pricing for this table
   const tablePricings = gamePricings.filter(p => p.table_id === table.id);
   
-  const handleStartSession = () => {
+  // Real-time timer for active sessions
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (activeSession) {
+      interval = setInterval(() => {
+        const startTime = new Date(activeSession.start_time).getTime();
+        const now = new Date().getTime();
+        const duration = Math.floor((now - startTime) / 1000 / 60); // in minutes
+        setSessionDuration(duration);
+      }, 1000); // Update every second
+    }
+    
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [activeSession]);
+  
+  const handleStartSession = async () => {
     if (!gameTypeId) {
       toast({
         title: "Error",
@@ -40,7 +62,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProp
       return;
     }
     
-    if (!playerName) {
+    if (!playerName.trim()) {
       toast({
         title: "Error",
         description: "Please enter player name",
@@ -49,14 +71,62 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProp
       return;
     }
     
-    startSession(table.id, gameTypeId, playerName);
-    toast({
-      title: "Session Started",
-      description: `Session started on Table ${table.table_number}`,
-    });
-    setOpen(false);
-    setPlayerName('');
-    setGameTypeId(null);
+    setIsStarting(true);
+    
+    try {
+      await startSession({
+        table_id: table.id,
+        game_type_id: gameTypeId,
+        player_name: playerName.trim(),
+        is_guest: true
+      });
+      
+      toast({
+        title: "Session Started",
+        description: `Session started on Table ${table.table_number} for ${playerName}`,
+      });
+      
+      setOpen(false);
+      setPlayerName('');
+      setGameTypeId(null);
+      
+      // Refresh tables to update status
+      refreshTables();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start session",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStarting(false);
+    }
+  };
+  
+  const handleEndSession = async () => {
+    if (!activeSession) return;
+    
+    setIsEnding(true);
+    
+    try {
+      await endSession(activeSession.id);
+      
+      toast({
+        title: "Session Ended",
+        description: `Session ended for Table ${table.table_number}`,
+      });
+      
+      // Refresh tables to update status
+      refreshTables();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to end session",
+        variant: "destructive",
+      });
+    } finally {
+      setIsEnding(false);
+    }
   };
   
   const getStatusColor = () => {
@@ -86,6 +156,20 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProp
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
     return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+  
+  const calculateCurrentCost = () => {
+    if (!activeSession) return 0;
+    
+    const pricing = tablePricings.find(p => p.game_type_id === activeSession.game_type_id);
+    if (!pricing) return 0;
+    
+    if (pricing.is_unlimited) {
+      return pricing.price;
+    } else {
+      const timeSlots = Math.ceil(sessionDuration / (pricing.time_limit_minutes || 60));
+      return timeSlots * pricing.price;
+    }
   };
   
   return (
@@ -149,17 +233,32 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProp
             </div>
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-red-600" />
-              <span className="text-sm">
-                Started: {new Date(activeSession.start_time).toLocaleTimeString()}
+              <span className="text-sm font-mono">
+                {formatDuration(sessionDuration)} • ${calculateCurrentCost().toFixed(2)}
               </span>
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm font-medium">
                 Game: {gameTypes.find(gt => gt.id === activeSession.game_type_id)?.name}
               </span>
-              <Button size="sm" variant="destructive">
-                End Session
-              </Button>
+              <div className="flex gap-1">
+                <Button size="sm" variant="outline" className="h-8">
+                  <ShoppingCart className="w-3 h-3" />
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="destructive" 
+                  onClick={handleEndSession}
+                  disabled={isEnding}
+                  className="h-8"
+                >
+                  {isEnding ? (
+                    <Clock className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Stop className="w-3 h-3" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         ) : (
@@ -218,7 +317,16 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProp
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button onClick={handleStartSession}>Start Session</Button>
+                  <Button onClick={handleStartSession} disabled={isStarting}>
+                    {isStarting ? (
+                      <>
+                        <Clock className="w-4 h-4 mr-2 animate-spin" />
+                        Starting...
+                      </>
+                    ) : (
+                      'Start Session'
+                    )}
+                  </Button>
                 </DialogFooter>
               </DialogContent>
             </Dialog>

@@ -4,11 +4,19 @@ import { apiClient } from './apiClient';
 // Start session - matches /api/sessions endpoint
 export const startSession = async (sessionData: {
   table_id: number;
-  player_id: number;
+  player_id?: number;
+  player_name?: string;
   game_type_id: number;
+  is_guest?: boolean;
 }): Promise<any> => {
   try {
-    const response = await apiClient.post('/api/sessions', sessionData);
+    const response = await apiClient.post('/api/sessions', {
+      table_id: sessionData.table_id,
+      player_id: sessionData.player_id,
+      player_name: sessionData.player_name || 'Guest Player',
+      game_type_id: sessionData.game_type_id,
+      is_guest: sessionData.is_guest || true
+    });
     
     if (response.success) {
       return response.data;
@@ -22,12 +30,12 @@ export const startSession = async (sessionData: {
 };
 
 // End session - matches /api/sessions/:id/end endpoint
-export const endSession = async (sessionId: number, endData: {
+export const endSession = async (sessionId: number, endData?: {
   total_amount?: number;
   notes?: string;
 }): Promise<any> => {
   try {
-    const response = await apiClient.put(`/api/sessions/${sessionId}/end`, endData);
+    const response = await apiClient.put(`/api/sessions/${sessionId}/end`, endData || {});
     
     if (response.success) {
       return response.data;
@@ -93,7 +101,7 @@ export const getActiveSessions = async (): Promise<any[]> => {
     throw new Error(response.message || 'Failed to get active sessions');
   } catch (error) {
     console.error('Error fetching active sessions:', error);
-    throw error;
+    return []; // Return empty array instead of throwing for UI stability
   }
 };
 
@@ -104,6 +112,61 @@ export const getCompletedSessions = async (): Promise<any[]> => {
     return Array.isArray(response) ? response : [];
   } catch (error) {
     console.error('Error fetching completed sessions:', error);
+    return [];
+  }
+};
+
+// Update session amount
+export const updateSessionAmount = async (sessionId: number, amount: number): Promise<any> => {
+  try {
+    const response = await apiClient.put(`/api/sessions/${sessionId}`, {
+      total_amount: amount
+    });
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to update session amount');
+  } catch (error) {
+    console.error('Error updating session amount:', error);
+    throw error;
+  }
+};
+
+// Add canteen order to session
+export const addCanteenOrderToSession = async (sessionId: number, orderData: {
+  items: Array<{
+    item_id: number;
+    quantity: number;
+  }>;
+}): Promise<any> => {
+  try {
+    const response = await apiClient.post(`/api/sessions/${sessionId}/orders`, orderData);
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to add canteen order');
+  } catch (error) {
+    console.error('Error adding canteen order:', error);
+    throw error;
+  }
+};
+
+// Get session orders
+export const getSessionOrders = async (sessionId: number): Promise<any[]> => {
+  try {
+    const response = await apiClient.get(`/api/sessions/${sessionId}/orders`);
+    
+    if (response.success) {
+      return response.data || [];
+    }
+    
+    throw new Error(response.message || 'Failed to get session orders');
+  } catch (error) {
+    console.error('Error fetching session orders:', error);
     return [];
   }
 };
