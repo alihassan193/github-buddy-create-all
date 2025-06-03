@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
 import { startSession, endSession } from "@/services/sessionService";
-import { Play, Clock, User, Settings, Coffee, ShoppingCart, stop } from "lucide-react";
+import { Play, Clock, User, Settings, Coffee, ShoppingCart, CircleStop } from "lucide-react";
 
 interface EnhancedTableCardProps {
   table: SnookerTable;
@@ -254,7 +254,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: EnhancedTableCardProp
                   {isEnding ? (
                     <Clock className="w-3 h-3 animate-spin" />
                   ) : (
-                    <stop className="w-3 h-3" />
+                    <CircleStop className="w-3 h-3" />
                   )}
                 </Button>
               </div>
