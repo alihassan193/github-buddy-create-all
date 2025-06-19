@@ -7,13 +7,18 @@ export const getAllGameTypes = async (): Promise<GameType[]> => {
   try {
     const response = await apiClient.get("/api/game-types");
     console.log("API Response - Game Types:", response);
+    
+    if (response.success && response.data) {
+      return response.data;
+    }
+    
     return response.data || [];
   } catch (error) {
     console.error("Error fetching game types:", error);
     // Return default game types if API fails
     return [
-      { id: 1, name: "Frames" },
-      { id: 2, name: "Century" },
+      { id: 1, name: "Frames", pricing_type: "fixed" },
+      { id: 2, name: "Century", pricing_type: "per_minute" },
     ];
   }
 };

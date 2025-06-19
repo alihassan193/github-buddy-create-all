@@ -5,27 +5,35 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
+import { startSession } from "@/services/sessionService";
+import PlayerSearchInput from "./PlayerSearchInput";
 
 interface TableCardProps {
   table: SnookerTable;
 }
 
 const TableCard = ({ table }: TableCardProps) => {
-  const { gameTypes, gamePricings, startSession } = useData();
+  const { gameTypes, gamePricings, refreshTables } = useData();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [gameTypeId, setGameTypeId] = useState<number | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [playerName, setPlayerName] = useState('');
+  const [isStarting, setIsStarting] = useState(false);
   
   // Filter pricing for this table
   const tablePricings = gamePricings.filter(p => p.table_id === table.id);
   
-  const handleStartSession = () => {
+  const handlePlayerSelect = (player: any, name: string) => {
+    setSelectedPlayer(player);
+    setPlayerName(name);
+  };
+  
+  const handleStartSession = async () => {
     if (!gameTypeId) {
       toast({
         title: "Error",
@@ -35,23 +43,61 @@ const TableCard = ({ table }: TableCardProps) => {
       return;
     }
     
-    if (!playerName) {
+    if (!playerName.trim()) {
       toast({
         title: "Error",
-        description: "Please enter player name",
+        description: "Please enter or select a player",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Find the pricing for the selected game type and table
+    const selectedPricing = tablePricings.find(p => p.game_type_id === gameTypeId);
+    if (!selectedPricing) {
+      toast({
+        title: "Error",
+        description: "No pricing found for selected game type",
         variant: "destructive",
       });
       return;
     }
     
-    startSession(table.id, gameTypeId, playerName);
-    toast({
-      title: "Session Started",
-      description: `Session started on ${table.table_number}`,
-    });
-    setOpen(false);
-    setPlayerName('');
-    setGameTypeId(null);
+    setIsStarting(true);
+    
+    try {
+      const sessionData = {
+        table_id: table.id,
+        game_type_id: gameTypeId,
+        pricing_id: selectedPricing.id,
+        player_name: playerName.trim(),
+        is_guest: !selectedPlayer,
+        ...(selectedPlayer && { player_id: selectedPlayer.id })
+      };
+
+      await startSession(sessionData);
+      
+      toast({
+        title: "Session Started",
+        description: `Session started on ${table.table_number} for ${playerName}`,
+      });
+      
+      setOpen(false);
+      setPlayerName('');
+      setSelectedPlayer(null);
+      setGameTypeId(null);
+      
+      // Refresh tables to update status
+      refreshTables();
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to start session",
+        variant: "destructive",
+      });
+    } finally {
+      setIsStarting(false);
+    }
   };
   
   const statusColors = {
@@ -122,10 +168,11 @@ const TableCard = ({ table }: TableCardProps) => {
             <DialogHeader>
               <DialogTitle>Start a New Session</DialogTitle>
               <DialogDescription>
-                Enter player details and select game type to start.
+                Search for a player or create a new one, then select game type to start.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4">
+              <PlayerSearchInput onPlayerSelect={handlePlayerSelect} />
               <div className="grid grid-cols-1 gap-2">
                 <Label htmlFor="gameType">Game Type</Label>
                 <Select onValueChange={(value) => setGameTypeId(Number(value))}>
@@ -144,18 +191,11 @@ const TableCard = ({ table }: TableCardProps) => {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-1 gap-2">
-                <Label htmlFor="playerName">Player Name</Label>
-                <Input 
-                  id="playerName" 
-                  placeholder="Enter player name" 
-                  value={playerName}
-                  onChange={(e) => setPlayerName(e.target.value)}
-                />
-              </div>
             </div>
             <DialogFooter>
-              <Button onClick={handleStartSession}>Start Session</Button>
+              <Button onClick={handleStartSession} disabled={isStarting}>
+                {isStarting ? 'Starting...' : 'Start Session'}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>

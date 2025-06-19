@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
@@ -13,6 +12,7 @@ import { Plus, Grid3X3, List, Search, Filter } from "lucide-react";
 import { createTable } from "@/services/tableService";
 import { getAllSessions } from "@/services/sessionService";
 import EnhancedTableCard from "@/components/EnhancedTableCard";
+import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 const Tables = () => {
   const { user } = useAuth();
@@ -30,33 +30,32 @@ const Tables = () => {
     description: ''
   });
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-        await refreshTables();
-        
-        // Fetch active sessions
-        const sessionsResponse = await getAllSessions({ status: 'active' });
-        setActiveSessions(sessionsResponse?.sessions || []);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to fetch tables data",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      await refreshTables();
+      
+      // Fetch active sessions
+      const sessionsResponse = await getAllSessions({ status: 'active' });
+      setActiveSessions(sessionsResponse?.sessions || []);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch tables data",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    fetchData();
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchData, 30000);
-    return () => clearInterval(interval);
-  }, [refreshTables, toast]);
+  // Use smart refresh instead of regular interval
+  const { forceRefresh } = useSmartRefresh({
+    refreshFn: fetchData,
+    interval: 30000,
+    skipWhenDialogsOpen: true
+  });
 
   const handleCreateTable = async () => {
     if (!newTable.table_number) {

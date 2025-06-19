@@ -7,8 +7,9 @@ export const createClub = async (clubData: {
   address?: string;
   phone?: string;
   email?: string;
-  opening_hours?: string;
   description?: string;
+  opening_hours?: any;
+  code_prefix?: string;
 }): Promise<any> => {
   try {
     const response = await apiClient.post('/api/clubs', clubData);
@@ -54,8 +55,10 @@ export const updateClub = async (id: number, clubData: {
   address?: string;
   phone?: string;
   email?: string;
-  opening_hours?: string;
   description?: string;
+  status?: string;
+  opening_hours?: any;
+  code_prefix?: string;
 }): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/clubs/${id}`, clubData);

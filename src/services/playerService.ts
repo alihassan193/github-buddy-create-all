@@ -102,10 +102,16 @@ export const deletePlayer = async (id: number): Promise<void> => {
   }
 };
 
-// Search players - matches /api/players/search/:query endpoint
-export const searchPlayers = async (query: string): Promise<any[]> => {
+// Search players with club_id - matches /api/players/search endpoint
+export const searchPlayers = async (query: string, clubId?: number): Promise<any[]> => {
   try {
-    const response = await apiClient.get(`/api/players/search/${encodeURIComponent(query)}`);
+    const queryParams = new URLSearchParams();
+    queryParams.append('search', query);
+    if (clubId) queryParams.append('club_id', clubId.toString());
+
+    console.log('Searching players with query:', query, 'clubId:', clubId);
+
+    const response = await apiClient.get(`/api/players/search?${queryParams.toString()}`);
     
     if (response.success) {
       return response.data || [];

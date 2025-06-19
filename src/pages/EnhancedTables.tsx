@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
@@ -27,7 +26,7 @@ const EnhancedTables = () => {
         setIsLoading(true);
         await refreshTables();
         
-        // Fetch active sessions
+        // Fetch active sessions using the new API structure
         const sessionsResponse = await getAllSessions({ status: 'active' });
         setActiveSessions(sessionsResponse?.sessions || []);
       } catch (error) {

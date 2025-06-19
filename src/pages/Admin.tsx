@@ -1,7 +1,12 @@
-
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/context/AuthContext";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import AdminTableList from "@/components/AdminTableList";
 import AdminUserManagement from "@/components/AdminUserManagement";
 import AdminCanteenInventory from "@/components/AdminCanteenInventory";
@@ -10,17 +15,19 @@ import { Building2, Users, Coffee, Table } from "lucide-react";
 
 const Admin = () => {
   const { user } = useAuth();
-  
-  const isSuperAdmin = user?.role === 'super_admin';
-  const isSubAdmin = user?.role === 'sub_admin';
+
+  const isSuperAdmin = user?.role === "super_admin";
+  const isSubAdmin = user?.role === "sub_admin";
   const isAdmin = isSuperAdmin || isSubAdmin;
-  
+
   if (!isAdmin) {
     return (
       <div className="container mx-auto py-6 px-4">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-red-600">Access Denied</h1>
-          <p className="text-gray-600 mt-2">You don't have permission to access this page.</p>
+          <p className="text-gray-600 mt-2">
+            You don't have permission to access this page.
+          </p>
         </div>
       </div>
     );
@@ -35,14 +42,12 @@ const Admin = () => {
         </p>
       </div>
 
-      <Tabs defaultValue={isSuperAdmin ? "clubs" : "users"} className="space-y-6">
-        <TabsList className={`grid w-full ${isSuperAdmin ? 'grid-cols-4' : 'grid-cols-3'}`}>
-          {isSuperAdmin && (
-            <TabsTrigger value="clubs" className="flex items-center gap-2">
-              <Building2 className="h-4 w-4" />
-              Clubs
-            </TabsTrigger>
-          )}
+      <Tabs defaultValue="clubs" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="clubs" className="flex items-center gap-2">
+            <Building2 className="h-4 w-4" />
+            Clubs
+          </TabsTrigger>
           <TabsTrigger value="users" className="flex items-center gap-2">
             <Users className="h-4 w-4" />
             Users
@@ -57,21 +62,19 @@ const Admin = () => {
           </TabsTrigger>
         </TabsList>
 
-        {isSuperAdmin && (
-          <TabsContent value="clubs">
-            <Card>
-              <CardHeader>
-                <CardTitle>Club Management</CardTitle>
-                <CardDescription>
-                  Manage clubs and assign managers to them.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <AdminClubManagement />
-              </CardContent>
-            </Card>
-          </TabsContent>
-        )}
+        <TabsContent value="clubs">
+          <Card>
+            {/* <CardHeader>
+              <CardTitle>Club Management</CardTitle>
+              <CardDescription>
+                Manage clubs and assign managers to them.
+              </CardDescription>
+            </CardHeader> */}
+            <CardContent>
+              <AdminClubManagement />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
         <TabsContent value="users">
           <Card>

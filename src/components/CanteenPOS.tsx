@@ -97,7 +97,7 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
       // For now, we'll just show a success message
       toast({
         title: "Order Processed",
-        description: `Order of $${getTotalAmount().toFixed(2)} added to session`,
+        description: `Order of Rs.${getTotalAmount().toFixed(2)} added to session`,
       });
       
       setCart([]);
@@ -165,7 +165,7 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
                     <div className="space-y-2">
                       <h4 className="font-medium text-sm line-clamp-2">{item.name}</h4>
                       <div className="flex justify-between items-center">
-                        <span className="font-bold text-green-600">${item.price}</span>
+                        <span className="font-bold text-green-600">Rs.{item.price}</span>
                         <Badge variant="outline" className="text-xs">
                           Stock: {item.stock_quantity}
                         </Badge>
@@ -229,7 +229,7 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
                         </Button>
                       </div>
                       <span className="font-bold text-green-600">
-                        ${(cartItem.item.price * cartItem.quantity).toFixed(2)}
+                        Rs.{(cartItem.item.price * cartItem.quantity).toFixed(2)}
                       </span>
                     </div>
                   </div>
@@ -244,7 +244,7 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
                   <div className="flex justify-between items-center">
                     <span className="font-semibold">Total:</span>
                     <span className="font-bold text-lg text-green-600">
-                      ${getTotalAmount().toFixed(2)}
+                      Rs.{getTotalAmount().toFixed(2)}
                     </span>
                   </div>
                   <Button onClick={handleCheckout} className="w-full">

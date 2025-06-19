@@ -6,14 +6,14 @@ export const getAllCategories = async (): Promise<any[]> => {
   try {
     const response = await apiClient.get('/api/canteen/categories');
     
-    if (response.success) {
-      return response.data || [];
+    if (response.success && response.data) {
+      return response.data;
     }
     
-    throw new Error(response.message || 'Failed to fetch categories');
+    return response.data || [];
   } catch (error) {
     console.error('Error fetching categories:', error);
-    throw error;
+    return []; // Return empty array for graceful fallback
   }
 };
 
@@ -39,27 +39,32 @@ export const createCanteenCategory = async (categoryData: {
 // Get all canteen items - matches /api/canteen/items endpoint
 export const getAllCanteenItems = async (params?: {
   category_id?: number;
+  club_id?: number;
   is_available?: boolean;
   page?: number;
   limit?: number;
-}): Promise<any> => {
+}): Promise<any[]> => {
   try {
     const queryParams = new URLSearchParams();
     if (params?.category_id) queryParams.append('category_id', params.category_id.toString());
+    if (params?.club_id) queryParams.append('club_id', params.club_id.toString());
     if (params?.is_available !== undefined) queryParams.append('is_available', params.is_available.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
     const response = await apiClient.get(`/api/canteen/items?${queryParams.toString()}`);
     
-    if (response.success) {
-      return response.data?.items || response.data || [];
+    console.log('Canteen items API response:', response);
+    
+    if (response.success && response.data) {
+      // Handle the nested structure from your API response
+      return response.data?.items || [];
     }
     
-    throw new Error(response.message || 'Failed to fetch canteen items');
+    return [];
   } catch (error) {
     console.error('Error fetching canteen items:', error);
-    throw error;
+    return []; // Return empty array for graceful fallback
   }
 };
 
@@ -161,6 +166,9 @@ export const updateStock = async (itemId: number, stockData: {
   }
 };
 
+// Add alias for backward compatibility
+export const updateCanteenItemStock = updateStock;
+
 // Get low stock items - matches /api/canteen/low-stock endpoint
 export const getLowStockItems = async (): Promise<any[]> => {
   try {
@@ -202,4 +210,23 @@ export const createQuickSale = async (saleData: any): Promise<any> => {
 export const getCanteenSalesReport = async (clubId: number, params?: any): Promise<any> => {
   console.warn('getCanteenSalesReport deprecated, use reports service instead');
   throw new Error('Use reports service instead');
+};
+
+// Get canteen items by club ID - specific helper function
+export const getCanteenItemsByClub = async (clubId: number): Promise<any[]> => {
+  try {
+    const response = await apiClient.get(`/api/canteen/items?club_id=${clubId}`);
+    
+    console.log('Canteen items by club API response:', response);
+    
+    if (response.success && response.data) {
+      // Handle the nested structure from your API response
+      return response.data?.items || [];
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error fetching canteen items by club:', error);
+    return []; // Return empty array for graceful fallback
+  }
 };

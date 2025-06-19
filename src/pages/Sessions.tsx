@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -9,6 +8,7 @@ import { Clock, DollarSign, User, Calendar, FileText, RefreshCw } from "lucide-r
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
 import { getActiveSessions, getCompletedSessions, endSession } from "@/services/sessionService";
+import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 const Sessions = () => {
   const { tables, gameTypes } = useData();
@@ -42,20 +42,29 @@ const Sessions = () => {
     }
   };
 
-  useEffect(() => {
-    fetchSessionsData();
-    
-    // Auto-refresh every 30 seconds
-    const interval = setInterval(fetchSessionsData, 30000);
-    return () => clearInterval(interval);
-  }, []);
+  // Use smart refresh instead of regular interval
+  const { forceRefresh } = useSmartRefresh({
+    refreshFn: fetchSessionsData,
+    interval: 30000,
+    skipWhenDialogsOpen: true
+  });
 
-  const getTableName = (tableId: number) => {
-    return tables.find(t => t.id === tableId)?.table_number || `Table #${tableId}`;
+  const getTableName = (session: any) => {
+    return session.table?.table_number || `Table #${session.table_id}`;
   };
 
-  const getGameTypeName = (gameTypeId: number) => {
-    return gameTypes.find(gt => gt.id === gameTypeId)?.name || 'Unknown';
+  const getGameTypeName = (session: any) => {
+    return session.gameType?.name || 'Unknown';
+  };
+
+  const getPlayerName = (session: any) => {
+    if (session.is_guest && session.guest_player_name) {
+      return session.guest_player_name;
+    }
+    if (session.player) {
+      return `${session.player.first_name || ''} ${session.player.last_name || ''}`.trim() || session.player.phone;
+    }
+    return 'Guest Player';
   };
 
   const getSessionDuration = (startTime: string, endTime?: string) => {
@@ -110,7 +119,7 @@ const Sessions = () => {
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={fetchSessionsData}
+            onClick={forceRefresh}
             disabled={isRefreshing}
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -139,8 +148,11 @@ const Sessions = () => {
                   <CardHeader className="pb-3">
                     <div className="flex justify-between items-start">
                       <div>
-                        <CardTitle className="text-lg">{getTableName(session.table_id)}</CardTitle>
-                        <CardDescription>{getGameTypeName(session.game_type_id)} Session</CardDescription>
+                        <CardTitle className="text-lg">{getTableName(session)}</CardTitle>
+                        <CardDescription>{getGameTypeName(session)} Session</CardDescription>
+                        <Badge variant="outline" className="mt-1 text-xs">
+                          {session.session_code}
+                        </Badge>
                       </div>
                       <Badge className="bg-blue-500">Active</Badge>
                     </div>
@@ -148,7 +160,7 @@ const Sessions = () => {
                   <CardContent className="space-y-4">
                     <div className="flex items-center gap-2">
                       <User className="h-4 w-4 text-blue-600" />
-                      <span className="font-medium">{session.player_name || 'Guest Player'}</span>
+                      <span className="font-medium">{getPlayerName(session)}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-green-600" />
@@ -158,12 +170,10 @@ const Sessions = () => {
                       <Calendar className="h-4 w-4 text-gray-600" />
                       <span className="text-sm">{new Date(session.start_time).toLocaleString()}</span>
                     </div>
-                    {session.total_amount && (
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-4 w-4 text-green-600" />
-                        <span className="font-medium">${session.total_amount.toFixed(2)}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-green-600" />
+                      <span className="font-medium">Rs.{parseFloat(session.total_amount || '0').toFixed(2)}</span>
+                    </div>
                     <Button 
                       onClick={() => handleEndSession(session.id)}
                       className="w-full bg-red-600 hover:bg-red-700"
@@ -191,6 +201,7 @@ const Sessions = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead>Session Code</TableHead>
                       <TableHead>Table</TableHead>
                       <TableHead>Player</TableHead>
                       <TableHead>Game Type</TableHead>
@@ -203,18 +214,21 @@ const Sessions = () => {
                   <TableBody>
                     {completedSessions.map((session) => (
                       <TableRow key={session.id}>
-                        <TableCell className="font-medium">
-                          {getTableName(session.table_id)}
+                        <TableCell className="font-medium font-mono text-sm">
+                          {session.session_code}
                         </TableCell>
-                        <TableCell>{session.player_name || 'Guest Player'}</TableCell>
-                        <TableCell>{getGameTypeName(session.game_type_id)}</TableCell>
+                        <TableCell className="font-medium">
+                          {getTableName(session)}
+                        </TableCell>
+                        <TableCell>{getPlayerName(session)}</TableCell>
+                        <TableCell>{getGameTypeName(session)}</TableCell>
                         <TableCell className="font-mono">
                           {session.end_time && getSessionDuration(session.start_time, session.end_time)}
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4" />
-                            {session.total_amount?.toFixed(2) || '0.00'}
+                            Rs.{parseFloat(session.total_amount || '0').toFixed(2)}
                           </div>
                         </TableCell>
                         <TableCell>
