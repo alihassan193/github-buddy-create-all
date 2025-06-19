@@ -1,6 +1,5 @@
-
 // Update API_BASE_URL to your actual API URL - modify this if needed
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "https://snooker.desert-safaridubai.ae";
 
 export const apiClient = {
   get: async (path: string) => {
@@ -10,7 +9,7 @@ export const apiClient = {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "Authorization": `Bearer ${token}` }),
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
     });
 
@@ -24,7 +23,9 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({ message: "An error occurred while fetching data" }));
+      const error = await response
+        .json()
+        .catch(() => ({ message: "An error occurred while fetching data" }));
       throw new Error(error.message || "An error occurred while fetching data");
     }
 
@@ -38,7 +39,7 @@ export const apiClient = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "Authorization": `Bearer ${token}` }),
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
       body: JSON.stringify(data),
     });
@@ -53,8 +54,12 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({ message: "An error occurred while submitting data" }));
-      throw new Error(error.message || "An error occurred while submitting data");
+      const error = await response
+        .json()
+        .catch(() => ({ message: "An error occurred while submitting data" }));
+      throw new Error(
+        error.message || "An error occurred while submitting data"
+      );
     }
 
     return response.json();
@@ -67,7 +72,7 @@ export const apiClient = {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "Authorization": `Bearer ${token}` }),
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
       body: JSON.stringify(data),
     });
@@ -82,7 +87,9 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({ message: "An error occurred while updating data" }));
+      const error = await response
+        .json()
+        .catch(() => ({ message: "An error occurred while updating data" }));
       throw new Error(error.message || "An error occurred while updating data");
     }
 
@@ -96,7 +103,7 @@ export const apiClient = {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
-        ...(token && { "Authorization": `Bearer ${token}` }),
+        ...(token && { Authorization: `Bearer ${token}` }),
       },
     });
 
@@ -110,7 +117,9 @@ export const apiClient = {
         }
       }
 
-      const error = await response.json().catch(() => ({ message: "An error occurred while deleting data" }));
+      const error = await response
+        .json()
+        .catch(() => ({ message: "An error occurred while deleting data" }));
       throw new Error(error.message || "An error occurred while deleting data");
     }
 
