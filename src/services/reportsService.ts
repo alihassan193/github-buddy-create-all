@@ -2,9 +2,12 @@
 import { apiClient } from './apiClient';
 
 // Get dashboard statistics - matches /api/reports/dashboard endpoint
-export const getDashboardStats = async (): Promise<any> => {
+export const getDashboardStats = async (clubId?: number): Promise<any> => {
   try {
-    const response = await apiClient.get('/api/reports/dashboard');
+    const queryParams = new URLSearchParams();
+    if (clubId) queryParams.append('club_id', clubId.toString());
+
+    const response = await apiClient.get(`/api/reports/dashboard?${queryParams.toString()}`);
     
     if (response.success) {
       return response.data;
@@ -22,12 +25,14 @@ export const getRevenueReport = async (params?: {
   start_date?: string;
   end_date?: string;
   group_by?: 'day' | 'week' | 'month';
+  club_id?: number;
 }): Promise<any[]> => {
   try {
     const queryParams = new URLSearchParams();
     if (params?.start_date) queryParams.append('start_date', params.start_date);
     if (params?.end_date) queryParams.append('end_date', params.end_date);
     if (params?.group_by) queryParams.append('group_by', params.group_by);
+    if (params?.club_id) queryParams.append('club_id', params.club_id.toString());
 
     const response = await apiClient.get(`/api/reports/revenue?${queryParams.toString()}`);
     
@@ -46,11 +51,13 @@ export const getRevenueReport = async (params?: {
 export const getSessionReport = async (params?: {
   start_date?: string;
   end_date?: string;
+  club_id?: number;
 }): Promise<any[]> => {
   try {
     const queryParams = new URLSearchParams();
     if (params?.start_date) queryParams.append('start_date', params.start_date);
     if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.club_id) queryParams.append('club_id', params.club_id.toString());
 
     const response = await apiClient.get(`/api/reports/sessions?${queryParams.toString()}`);
     
@@ -69,11 +76,13 @@ export const getSessionReport = async (params?: {
 export const getPlayerReport = async (params?: {
   start_date?: string;
   end_date?: string;
+  club_id?: number;
 }): Promise<any[]> => {
   try {
     const queryParams = new URLSearchParams();
     if (params?.start_date) queryParams.append('start_date', params.start_date);
     if (params?.end_date) queryParams.append('end_date', params.end_date);
+    if (params?.club_id) queryParams.append('club_id', params.club_id.toString());
 
     const response = await apiClient.get(`/api/reports/players?${queryParams.toString()}`);
     

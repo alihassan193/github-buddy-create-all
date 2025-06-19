@@ -1,10 +1,5 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { getAllCanteenItems, getAllCategories, getCanteenItemsByClub } from '@/services/canteenService';
-import { getAllGameTypes } from '@/services/gameTypeService';
-import { getAllTables } from '@/services/tableService';
-import { getAllSessions } from '@/services/sessionService';
-import { useSmartRefresh } from '@/hooks/useSmartRefresh';
 
 interface DataContextType {
   // Tables
@@ -87,7 +82,6 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const [canteenCategories, setCanteenCategories] = useState<any[]>(FALLBACK_CANTEEN_CATEGORIES);
   const [gameTypes, setGameTypes] = useState<any[]>(FALLBACK_GAME_TYPES);
   const [isLoading, setIsLoading] = useState(false);
-  const [refreshCount, setRefreshCount] = useState(0);
   
   // Additional state for missing properties
   const [gamePricings, setGamePricings] = useState<any[]>([]);
@@ -95,9 +89,9 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const [completedSessions, setCompletedSessions] = useState<any[]>([]);
   const [canteenOrders, setCanteenOrders] = useState<any[]>([]);
   const [invoices, setInvoices] = useState<any[]>([]);
-  const [clubId, setClubId] = useState<number | null>(1); // Default to 1
+  const [clubId, setClubId] = useState<number | null>(1);
 
-  // Get club_id from localStorage (set during login)
+  // Get club_id from localStorage once
   useEffect(() => {
     const userData = localStorage.getItem('userData');
     if (userData) {
@@ -112,65 +106,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const refreshTables = async () => {
-    console.log('Using fallback tables data - API calls disabled');
-    setTables(FALLBACK_TABLES);
-  };
-
-  const refreshSessions = async () => {
-    console.log('Using empty sessions data - API calls disabled');
-    setSessions([]);
-  };
-
-  const refreshCanteenData = async () => {
-    console.log('Using fallback canteen data - API calls disabled');
-    setCanteenItems(FALLBACK_CANTEEN_ITEMS);
-    setCanteenCategories(FALLBACK_CANTEEN_CATEGORIES);
-  };
-
-  const refreshGameTypes = async () => {
-    console.log('Using fallback game types - API calls disabled');
-    setGameTypes(FALLBACK_GAME_TYPES);
-    
-    // Create mock pricings for each game type and table combination
-    const mockPricings: any[] = [];
-    FALLBACK_TABLES.forEach(table => {
-      FALLBACK_GAME_TYPES.forEach(gameType => {
-        mockPricings.push({
-          id: `${table.id}-${gameType.id}`,
-          table_id: table.id,
-          game_type_id: gameType.id,
-          price: gameType.pricing_type === 'fixed' ? 100 : 5,
-          is_unlimited: gameType.pricing_type === 'fixed',
-          time_limit_minutes: gameType.pricing_type === 'fixed' ? null : 60
-        });
-      });
-    });
-    
-    console.log('Generated mock pricings:', mockPricings);
-    setGamePricings(mockPricings);
-  };
-
-  const refreshAllData = async () => {
-    console.log('Refresh all data using fallback data only');
-    setIsLoading(true);
-    
-    try {
-      await Promise.all([
-        refreshTables(),
-        refreshSessions(),
-        refreshCanteenData(),
-        refreshGameTypes()
-      ]);
-      console.log('All fallback data loaded successfully');
-    } catch (error) {
-      console.error('Error setting fallback data:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Generate pricings on component mount
+  // Generate mock pricings once
   useEffect(() => {
     const mockPricings: any[] = [];
     FALLBACK_TABLES.forEach(table => {
@@ -188,40 +124,48 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     setGamePricings(mockPricings);
   }, []);
 
+  const refreshTables = async () => {
+    // Use static data, no API calls
+    return Promise.resolve();
+  };
+
+  const refreshSessions = async () => {
+    // Use static data, no API calls
+    return Promise.resolve();
+  };
+
+  const refreshCanteenData = async () => {
+    // Use static data, no API calls
+    return Promise.resolve();
+  };
+
+  const refreshGameTypes = async () => {
+    // Use static data, no API calls
+    return Promise.resolve();
+  };
+
+  const refreshAllData = async () => {
+    // No-op, using static data
+    return Promise.resolve();
+  };
+
   // Stub implementations for missing functions
   const endGame = (gameId: string) => {
     console.log('End game:', gameId);
-    // TODO: Implement actual game ending logic
   };
 
   const addFrame = (gameId: string, winner: string, loser: string) => {
     console.log('Add frame:', gameId, winner, loser);
-    // TODO: Implement actual frame adding logic
   };
 
   const createInvoice = (tableId: string): string => {
     console.log('Create invoice for table:', tableId);
-    // TODO: Implement actual invoice creation logic
     return `invoice-${Date.now()}`;
   };
 
   const payInvoice = (invoiceId: string) => {
     console.log('Pay invoice:', invoiceId);
-    // TODO: Implement actual invoice payment logic
   };
-
-  // Disable smart refresh to prevent API call loops
-  // useSmartRefresh({
-  //   refreshFn: refreshAllData,
-  //   interval: 60000,
-  //   skipWhenDialogsOpen: true
-  // });
-
-  // Initial data load - only set fallback data once
-  useEffect(() => {
-    console.log('Loading initial fallback data...');
-    refreshAllData();
-  }, []);
 
   const value: DataContextType = {
     tables,

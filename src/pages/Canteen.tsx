@@ -11,31 +11,10 @@ import CanteenPOS from "@/components/CanteenPOS";
 import { useToast } from "@/hooks/use-toast";
 
 const Canteen = () => {
-  const { canteenItems, canteenCategories, refreshCanteenData } = useData();
+  const { canteenItems, canteenCategories } = useData();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("inventory");
   const [showPOS, setShowPOS] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        setIsLoading(true);
-        await refreshCanteenData();
-      } catch (error) {
-        console.error("Error loading canteen data:", error);
-        toast({
-          title: "Error",
-          description: "Failed to load canteen data",
-          variant: "destructive"
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadData();
-  }, [refreshCanteenData]);
 
   const getCategoryItems = (categoryId: number) => {
     return canteenItems.filter(item => item.category_id === categoryId);
@@ -50,17 +29,6 @@ const Canteen = () => {
     const numPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
     return numPrice.toFixed(2);
   };
-
-  if (isLoading) {
-    return (
-      <div className="container mx-auto py-6 px-4">
-        <div className="text-center">
-          <Coffee className="h-8 w-8 mx-auto mb-4 animate-pulse" />
-          <p>Loading canteen data...</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="container mx-auto py-6 px-4">
@@ -184,7 +152,7 @@ const Canteen = () => {
         <CanteenPOS 
           open={showPOS} 
           onOpenChange={setShowPOS}
-          session={null} // Pass null or appropriate session data
+          session={null}
         />
       )}
     </div>
