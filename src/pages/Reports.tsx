@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useData } from "@/context/DataContext";
 import {
@@ -106,37 +105,68 @@ const Reports = () => {
 
   const filteredSessions = filterSessionsByDate(completedSessions);
 
-  // Calculate metrics from dashboard stats or fallback to local data
-  const totalRevenue = dashboardStats?.total_revenue || filteredSessions.reduce(
-    (sum, session) => sum + (session.total_amount || 0),
-    0
-  );
-  
-  const totalSessions = dashboardStats?.total_sessions || filteredSessions.length;
-  
-  const averageSessionDuration = dashboardStats?.average_session_duration || (
-    filteredSessions.length > 0
-      ? filteredSessions.reduce((sum, session) => {
-          if (session.end_time) {
-            const duration =
-              new Date(session.end_time).getTime() -
-              new Date(session.start_time).getTime();
-            return sum + duration;
-          }
-          return sum;
-        }, 0) /
-        filteredSessions.length /
-        (1000 * 60)
-      : 0
-  ); // in minutes
+  // Calculate metrics from dashboard stats or fallback to local data with proper number handling
+  const calculateTotalRevenue = () => {
+    const apiRevenue = dashboardStats?.total_revenue;
+    if (typeof apiRevenue === 'number' && !isNaN(apiRevenue)) {
+      return apiRevenue;
+    }
+    
+    const fallbackRevenue = filteredSessions.reduce(
+      (sum, session) => sum + (Number(session.total_amount) || 0),
+      0
+    );
+    return fallbackRevenue;
+  };
 
-  const canteenRevenue = dashboardStats?.canteen_revenue || canteenOrders
-    .filter((order) => {
-      if (!dateRange?.from || !dateRange?.to) return true;
-      const orderDate = new Date(order.order_time);
-      return orderDate >= dateRange.from! && orderDate <= dateRange.to!;
-    })
-    .reduce((sum, order) => sum + order.total_price, 0);
+  const calculateTotalSessions = () => {
+    const apiSessions = dashboardStats?.total_sessions;
+    if (typeof apiSessions === 'number' && !isNaN(apiSessions)) {
+      return apiSessions;
+    }
+    return filteredSessions.length;
+  };
+
+  const calculateAverageSessionDuration = () => {
+    const apiDuration = dashboardStats?.average_session_duration;
+    if (typeof apiDuration === 'number' && !isNaN(apiDuration)) {
+      return apiDuration;
+    }
+    
+    if (filteredSessions.length === 0) return 0;
+    
+    const totalDuration = filteredSessions.reduce((sum, session) => {
+      if (session.end_time) {
+        const duration =
+          new Date(session.end_time).getTime() -
+          new Date(session.start_time).getTime();
+        return sum + duration;
+      }
+      return sum;
+    }, 0);
+    
+    return totalDuration / filteredSessions.length / (1000 * 60); // in minutes
+  };
+
+  const calculateCanteenRevenue = () => {
+    const apiCanteenRevenue = dashboardStats?.canteen_revenue;
+    if (typeof apiCanteenRevenue === 'number' && !isNaN(apiCanteenRevenue)) {
+      return apiCanteenRevenue;
+    }
+    
+    return canteenOrders
+      .filter((order) => {
+        if (!dateRange?.from || !dateRange?.to) return true;
+        const orderDate = new Date(order.order_time);
+        return orderDate >= dateRange.from! && orderDate <= dateRange.to!;
+      })
+      .reduce((sum, order) => sum + (Number(order.total_price) || 0), 0);
+  };
+
+  const totalRevenue = calculateTotalRevenue();
+  const totalSessions = calculateTotalSessions();
+  const averageSessionDuration = calculateAverageSessionDuration();
+  const canteenRevenue = calculateCanteenRevenue();
 
   // Process revenue data for charts
   const processedRevenueData = revenueData.length > 0 ? revenueData : Array.from({ length: 7 }, (_, i) => {
@@ -150,7 +180,7 @@ const Reports = () => {
         const sessionDate = new Date(session.start_time);
         return sessionDate >= dayStart && sessionDate <= dayEnd;
       })
-      .reduce((sum, session) => sum + (session.total_amount || 0), 0);
+      .reduce((sum, session) => sum + (Number(session.total_amount) || 0), 0);
 
     return {
       date: dayStart.toLocaleDateString("en-US", { weekday: "short" }),
@@ -167,7 +197,7 @@ const Reports = () => {
       name: table.table_number,
       sessions: tableSessions.length,
       revenue: tableSessions.reduce(
-        (sum, session) => sum + (session.total_amount || 0),
+        (sum, session) => sum + (Number(session.total_amount) || 0),
         0
       ),
     };
@@ -182,7 +212,7 @@ const Reports = () => {
       name: gameType.name,
       sessions: gameTypeSessions.length,
       revenue: gameTypeSessions.reduce(
-        (sum, session) => sum + (session.total_amount || 0),
+        (sum, session) => sum + (Number(session.total_amount) || 0),
         0
       ),
     };
@@ -278,6 +308,7 @@ const Reports = () => {
         </Card>
       </div>
 
+      {/* Tabs component */}
       <Tabs defaultValue="overview" className="space-y-4">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
