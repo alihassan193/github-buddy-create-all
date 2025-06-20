@@ -1,5 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getAllCanteenItems, getAllCategories } from '@/services/canteenService';
+import { getAllTables } from '@/services/tableService';
+import { getAllSessions } from '@/services/sessionService';
 
 interface DataContextType {
   // Tables
@@ -62,7 +65,7 @@ const FALLBACK_GAME_TYPES = [
 ];
 
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
-  const [tables, setTables] = useState<any[]>(FALLBACK_TABLES);
+  const [tables, setTables] = useState<any[]>([]);
   const [sessions, setSessions] = useState<any[]>([]);
   const [canteenItems, setCanteenItems] = useState<any[]>([]);
   const [canteenCategories, setCanteenCategories] = useState<any[]>([]);
@@ -91,6 +94,39 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       }
     }
   }, []);
+
+  // Load tables data from API
+  const refreshTables = async () => {
+    try {
+      console.log('Fetching tables data...');
+      const tablesData = await getAllTables();
+      console.log('Tables API response:', tablesData);
+      setTables(tablesData || FALLBACK_TABLES);
+    } catch (error) {
+      console.error('Error loading tables:', error);
+      setTables(FALLBACK_TABLES);
+    }
+  };
+
+  // Load sessions data from API
+  const refreshSessions = async () => {
+    try {
+      console.log('Fetching sessions data...');
+      const sessionsResponse = await getAllSessions();
+      console.log('Sessions API response:', sessionsResponse);
+      
+      // Extract sessions from the response structure
+      const allSessions = sessionsResponse?.sessions || [];
+      setSessions(allSessions);
+      
+      // Also update completed sessions for other components
+      const completed = allSessions.filter((session: any) => session.status === 'completed');
+      setCompletedSessions(completed);
+    } catch (error) {
+      console.error('Error loading sessions:', error);
+      setSessions([]);
+    }
+  };
 
   // Load canteen data from API
   const refreshCanteenData = async () => {
@@ -131,6 +167,25 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }
   }, [clubId]);
 
+  // Load initial data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([
+          refreshTables(),
+          refreshSessions()
+        ]);
+      } catch (error) {
+        console.error('Error loading initial data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadInitialData();
+  }, []);
+
   // Generate mock pricings once
   useEffect(() => {
     const mockPricings: any[] = [];
@@ -148,16 +203,6 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     });
     setGamePricings(mockPricings);
   }, []);
-
-  const refreshTables = async () => {
-    // Use static data, no API calls
-    return Promise.resolve();
-  };
-
-  const refreshSessions = async () => {
-    // Use static data, no API calls
-    return Promise.resolve();
-  };
 
   const refreshGameTypes = async () => {
     // Use static data, no API calls
