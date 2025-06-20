@@ -69,7 +69,7 @@ const Tables = () => {
 
     try {
       await createTable({
-        table_number: parseInt(newTable.table_number),
+        table_number: newTable.table_number, // Keep as string
         table_type: newTable.table_type,
         description: newTable.description || undefined
       });

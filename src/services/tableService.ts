@@ -46,14 +46,20 @@ export const getTableById = async (tableId: number): Promise<any> => {
 
 // Create new table
 export const createTable = async (tableData: {
-  table_number: string;
-  club_id: number;
+  table_number: string | number;
+  club_id?: number;
   status?: string;
   table_type?: string;
   description?: string;
 }): Promise<any> => {
   try {
-    const response = await apiClient.post('/api/tables', tableData);
+    // Convert table_number to string if it's a number
+    const processedData = {
+      ...tableData,
+      table_number: tableData.table_number.toString()
+    };
+    
+    const response = await apiClient.post('/api/tables', processedData);
     
     if (response.success) {
       return response.data;
@@ -83,6 +89,27 @@ export const updateTable = async (tableId: number, tableData: {
     throw new Error(response.message || 'Failed to update table');
   } catch (error) {
     console.error('Error updating table:', error);
+    throw error;
+  }
+};
+
+// Update table pricing
+export const updateTablePricing = async (tableId: number, pricingData: Array<{
+  game_type_id: number;
+  price: number;
+  time_limit_minutes?: number;
+  is_unlimited?: boolean;
+}>): Promise<any> => {
+  try {
+    const response = await apiClient.put(`/api/tables/${tableId}/pricing`, { pricing: pricingData });
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to update table pricing');
+  } catch (error) {
+    console.error('Error updating table pricing:', error);
     throw error;
   }
 };

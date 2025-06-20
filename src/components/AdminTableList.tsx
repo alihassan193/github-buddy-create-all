@@ -99,21 +99,10 @@ const AdminTableList = () => {
       return;
     }
 
-    // Convert table_number to number for API call
-    const tableNumber = parseInt(newTable.table_number as string);
-    if (isNaN(tableNumber)) {
-      toast({
-        title: "Error",
-        description: "Table number must be a valid number",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
     try {
       await createTable({
-        table_number: tableNumber,
+        table_number: newTable.table_number,
         table_type: "standard",
       });
 
@@ -121,7 +110,7 @@ const AdminTableList = () => {
 
       toast({
         title: "Table Added",
-        description: `Table ${tableNumber} has been added`,
+        description: `Table ${newTable.table_number} has been added`,
       });
 
       setDialogOpen(false);

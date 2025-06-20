@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -165,10 +164,8 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
 
     setIsEnding(true);
     try {
-      await endSession(activeSession.id, {
-        total_amount: sessionCost,
-        notes: notes.trim() || undefined
-      });
+      // Fix: endSession now expects only sessionId as first parameter
+      await endSession(activeSession.id);
 
       toast({
         title: "Session Ended",

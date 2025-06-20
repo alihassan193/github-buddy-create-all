@@ -36,6 +36,28 @@ export const getAllSessions = async (params?: {
   }
 };
 
+// Get active sessions
+export const getActiveSessions = async (): Promise<any[]> => {
+  try {
+    const response = await getAllSessions({ status: 'active' });
+    return response.sessions || [];
+  } catch (error) {
+    console.error('Error fetching active sessions:', error);
+    return [];
+  }
+};
+
+// Get completed sessions
+export const getCompletedSessions = async (): Promise<any[]> => {
+  try {
+    const response = await getAllSessions({ status: 'completed' });
+    return response.sessions || [];
+  } catch (error) {
+    console.error('Error fetching completed sessions:', error);
+    return [];
+  }
+};
+
 // Get session by ID
 export const getSessionById = async (sessionId: number): Promise<any> => {
   try {
@@ -48,6 +70,32 @@ export const getSessionById = async (sessionId: number): Promise<any> => {
     throw new Error(response.message || 'Failed to fetch session');
   } catch (error) {
     console.error('Error fetching session:', error);
+    throw error;
+  }
+};
+
+// Start session
+export const startSession = async (sessionData: {
+  table_id: number;
+  game_type_id: number;
+  player_id?: number;
+  player_name?: string;
+  guest_player_name?: string;
+  guest_player_phone?: string;
+  is_guest?: boolean;
+  pricing_id?: number;
+  notes?: string;
+}): Promise<any> => {
+  try {
+    const response = await apiClient.post('/api/sessions', sessionData);
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to start session');
+  } catch (error) {
+    console.error('Error starting session:', error);
     throw error;
   }
 };
@@ -105,9 +153,9 @@ export const updateSession = async (sessionId: number, sessionData: {
 };
 
 // End session
-export const endSession = async (sessionId: number): Promise<any> => {
+export const endSession = async (sessionId: number, additionalData?: any): Promise<any> => {
   try {
-    const response = await apiClient.put(`/api/sessions/${sessionId}/end`, {});
+    const response = await apiClient.put(`/api/sessions/${sessionId}/end`, additionalData || {});
     
     if (response.success) {
       return response.data;
@@ -148,6 +196,27 @@ export const resumeSession = async (sessionId: number): Promise<any> => {
     throw new Error(response.message || 'Failed to resume session');
   } catch (error) {
     console.error('Error resuming session:', error);
+    throw error;
+  }
+};
+
+// Add canteen order to session
+export const addCanteenOrderToSession = async (sessionId: number, orderData: {
+  items: Array<{
+    item_id: number;
+    quantity: number;
+  }>;
+}): Promise<any> => {
+  try {
+    const response = await apiClient.post(`/api/sessions/${sessionId}/canteen-order`, orderData);
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to add canteen order');
+  } catch (error) {
+    console.error('Error adding canteen order:', error);
     throw error;
   }
 };
