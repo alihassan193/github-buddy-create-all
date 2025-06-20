@@ -1,5 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { getAllCanteenItems, getAllCategories } from '@/services/canteenService';
 
 interface DataContextType {
   // Tables
@@ -61,25 +61,11 @@ const FALLBACK_GAME_TYPES = [
   { id: 2, name: "Century", pricing_type: "per_minute" },
 ];
 
-const FALLBACK_CANTEEN_CATEGORIES = [
-  { id: 1, name: "Beverages" },
-  { id: 2, name: "Snacks" },
-  { id: 3, name: "Main Course" },
-];
-
-const FALLBACK_CANTEEN_ITEMS = [
-  { id: 1, name: "Tea", price: 25, category_id: 1, stock_quantity: 50 },
-  { id: 2, name: "Coffee", price: 30, category_id: 1, stock_quantity: 40 },
-  { id: 3, name: "Samosa", price: 15, category_id: 2, stock_quantity: 30 },
-  { id: 4, name: "Sandwich", price: 45, category_id: 2, stock_quantity: 20 },
-  { id: 5, name: "Biryani", price: 120, category_id: 3, stock_quantity: 15 },
-];
-
 export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const [tables, setTables] = useState<any[]>(FALLBACK_TABLES);
   const [sessions, setSessions] = useState<any[]>([]);
-  const [canteenItems, setCanteenItems] = useState<any[]>(FALLBACK_CANTEEN_ITEMS);
-  const [canteenCategories, setCanteenCategories] = useState<any[]>(FALLBACK_CANTEEN_CATEGORIES);
+  const [canteenItems, setCanteenItems] = useState<any[]>([]);
+  const [canteenCategories, setCanteenCategories] = useState<any[]>([]);
   const [gameTypes, setGameTypes] = useState<any[]>(FALLBACK_GAME_TYPES);
   const [isLoading, setIsLoading] = useState(false);
   
@@ -105,6 +91,45 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       }
     }
   }, []);
+
+  // Load canteen data from API
+  const refreshCanteenData = async () => {
+    if (!clubId) return;
+    
+    try {
+      setIsLoading(true);
+      
+      // Fetch categories
+      const categoriesResponse = await getAllCategories();
+      console.log('Categories API response:', categoriesResponse);
+      setCanteenCategories(categoriesResponse || []);
+      
+      // Fetch items with club_id
+      const itemsResponse = await getAllCanteenItems({ club_id: clubId });
+      console.log('Items API response:', itemsResponse);
+      
+      // Transform the items to match expected structure
+      const processedItems = itemsResponse.map((item: any) => ({
+        ...item,
+        price: parseFloat(item.price) || 0,
+        category_name: item.category?.name || 'Unknown'
+      }));
+      
+      setCanteenItems(processedItems);
+    } catch (error) {
+      console.error('Error loading canteen data:', error);
+      // Keep existing data on error
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Load canteen data when clubId changes
+  useEffect(() => {
+    if (clubId) {
+      refreshCanteenData();
+    }
+  }, [clubId]);
 
   // Generate mock pricings once
   useEffect(() => {
@@ -134,19 +159,18 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     return Promise.resolve();
   };
 
-  const refreshCanteenData = async () => {
-    // Use static data, no API calls
-    return Promise.resolve();
-  };
-
   const refreshGameTypes = async () => {
     // Use static data, no API calls
     return Promise.resolve();
   };
 
   const refreshAllData = async () => {
-    // No-op, using static data
-    return Promise.resolve();
+    await Promise.all([
+      refreshTables(),
+      refreshSessions(),
+      refreshCanteenData(),
+      refreshGameTypes()
+    ]);
   };
 
   // Stub implementations for missing functions
