@@ -7,9 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { ShoppingCart, Plus, Minus, Trash2 } from "lucide-react";
 import { CanteenItem, CartItem } from "@/types";
+import { createQuickSale } from "@/services/sessionService";
 
 interface CanteenPOSProps {
   open: boolean;
@@ -18,11 +21,14 @@ interface CanteenPOSProps {
 }
 
 const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
-  const { canteenItems, canteenCategories } = useData();
+  const { canteenItems, canteenCategories, clubId } = useData();
   const { toast } = useToast();
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
+  const [customerName, setCustomerName] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // Filter items based on search and category
   const filteredItems = canteenItems.filter(item => {
@@ -92,22 +98,48 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
       return;
     }
 
-    try {
-      // Here you would call the API to add the order to the session
-      // For now, we'll just show a success message
+    if (!customerName.trim()) {
       toast({
-        title: "Order Processed",
-        description: `Order of Rs.${getTotalAmount().toFixed(2)} added to session`,
-      });
-      
-      setCart([]);
-      onOpenChange(false);
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to process order",
+        title: "Customer Name Required",
+        description: "Please enter customer name",
         variant: "destructive",
       });
+      return;
+    }
+
+    setIsProcessing(true);
+
+    try {
+      const saleData = {
+        club_id: clubId || 1,
+        customer_name: customerName.trim(),
+        payment_method: paymentMethod,
+        items: cart.map(cartItem => ({
+          canteen_item_id: cartItem.item.id,
+          quantity: cartItem.quantity
+        }))
+      };
+
+      const result = await createQuickSale(saleData);
+      
+      toast({
+        title: "Sale Completed",
+        description: `Sale completed successfully. Invoice: ${result.invoice.invoice_number}`,
+      });
+      
+      // Reset form
+      setCart([]);
+      setCustomerName("");
+      setPaymentMethod("cash");
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process sale",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -117,7 +149,7 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            Canteen POS {session && `- Table ${session.table_number || session.table_id}`}
+            Canteen POS - Quick Sale
           </DialogTitle>
         </DialogHeader>
 
@@ -186,7 +218,36 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
 
           {/* Cart Section */}
           <div className="bg-gray-50 rounded-lg p-4 space-y-4 overflow-y-auto">
-            <h3 className="font-semibold">Order Summary</h3>
+            <h3 className="font-semibold">Quick Sale</h3>
+
+            {/* Customer Details */}
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="customerName">Customer Name</Label>
+                <Input
+                  id="customerName"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="Enter customer name"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="paymentMethod">Payment Method</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="card">Card</SelectItem>
+                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Separator />
             
             {cart.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -247,8 +308,12 @@ const CanteenPOS = ({ open, onOpenChange, session }: CanteenPOSProps) => {
                       Rs.{getTotalAmount().toFixed(2)}
                     </span>
                   </div>
-                  <Button onClick={handleCheckout} className="w-full">
-                    Add to Session
+                  <Button 
+                    onClick={handleCheckout} 
+                    className="w-full"
+                    disabled={isProcessing || !customerName.trim()}
+                  >
+                    {isProcessing ? 'Processing...' : 'Complete Sale'}
                   </Button>
                 </div>
               </>

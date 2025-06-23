@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useData } from "@/context/DataContext";
@@ -16,14 +17,14 @@ import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 const Tables = () => {
   const { user } = useAuth();
-  const { tables, refreshTables, clubId } = useData();
+  const { tables, refreshTables, clubId, isLoading } = useData();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
+  const [isFetching, setIsFetching] = useState(false);
   const [newTable, setNewTable] = useState({
     table_number: '',
     table_type: 'standard',
@@ -32,12 +33,17 @@ const Tables = () => {
 
   const fetchData = async () => {
     try {
-      setIsLoading(true);
+      setIsFetching(true);
+      console.log('Fetching tables and sessions data...');
+      
       await refreshTables();
       
       // Fetch active sessions with club_id
-      const activeSessionsData = await getActiveSessions(clubId || 1);
-      setActiveSessions(activeSessionsData);
+      if (clubId) {
+        const activeSessionsData = await getActiveSessions(clubId);
+        console.log('Active sessions data:', activeSessionsData);
+        setActiveSessions(activeSessionsData);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
@@ -46,9 +52,17 @@ const Tables = () => {
         variant: "destructive"
       });
     } finally {
-      setIsLoading(false);
+      setIsFetching(false);
     }
   };
+
+  // Initial data load
+  useEffect(() => {
+    if (clubId) {
+      console.log('Club ID available, fetching data:', clubId);
+      fetchData();
+    }
+  }, [clubId]);
 
   // Use smart refresh instead of regular interval
   const { forceRefresh } = useSmartRefresh({
@@ -116,10 +130,11 @@ const Tables = () => {
   const statusCounts = getStatusCounts();
   const canManageTables = user?.permissions?.can_manage_tables || user?.role === 'super_admin';
 
-  if (isLoading) {
+  if (isLoading || isFetching) {
     return (
       <div className="container mx-auto py-6 px-4">
         <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Loading tables...</p>
         </div>
       </div>

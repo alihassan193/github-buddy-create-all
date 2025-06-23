@@ -1,110 +1,100 @@
+
 import { useState, useEffect } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Clock, DollarSign, User, Calendar, FileText, RefreshCw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
-import { getActiveSessions, getCompletedSessions, endSession } from "@/services/sessionService";
-import { useSmartRefresh } from "@/hooks/useSmartRefresh";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
+import { Calendar, Clock, User, DollarSign, Search, Filter } from "lucide-react";
+import { getAllSessions } from "@/services/sessionService";
+import { format } from "date-fns";
 
 const Sessions = () => {
-  const { tables, gameTypes, clubId } = useData();
+  const { clubId } = useData();
   const { toast } = useToast();
-  const [activeSessions, setActiveSessions] = useState<any[]>([]);
-  const [completedSessions, setCompletedSessions] = useState<any[]>([]);
+  const [sessions, setSessions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  const fetchSessionsData = async () => {
+  const fetchSessions = async () => {
+    if (!clubId) return;
+    
     try {
-      setIsRefreshing(true);
+      setIsLoading(true);
+      console.log('Fetching sessions for club:', clubId);
       
-      const [activeData, completedData] = await Promise.all([
-        getActiveSessions(clubId || 1),
-        getCompletedSessions(clubId || 1)
-      ]);
+      const response = await getAllSessions({ club_id: clubId });
+      console.log('Sessions response:', response);
       
-      setActiveSessions(activeData);
-      setCompletedSessions(completedData);
+      if (response && response.sessions) {
+        setSessions(response.sessions);
+      } else {
+        setSessions([]);
+      }
     } catch (error) {
-      console.error("Error fetching sessions:", error);
+      console.error('Error fetching sessions:', error);
       toast({
         title: "Error",
-        description: "Failed to fetch sessions data",
+        description: "Failed to fetch sessions",
         variant: "destructive"
       });
+      setSessions([]);
     } finally {
       setIsLoading(false);
-      setIsRefreshing(false);
     }
   };
 
-  // Use smart refresh instead of regular interval
-  const { forceRefresh } = useSmartRefresh({
-    refreshFn: fetchSessionsData,
-    interval: 30000,
-    skipWhenDialogsOpen: true
+  useEffect(() => {
+    if (clubId) {
+      console.log('Club ID available, fetching sessions:', clubId);
+      fetchSessions();
+    }
+  }, [clubId]);
+
+  const filteredSessions = sessions.filter(session => {
+    const matchesStatus = statusFilter === 'all' || session.status === statusFilter;
+    const matchesSearch = searchQuery === '' || 
+      session.session_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      session.player?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      session.player?.last_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      session.table?.table_number?.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return matchesStatus && matchesSearch;
   });
 
-  const getTableName = (session: any) => {
-    return session.table?.table_number || `Table #${session.table_id}`;
-  };
-
-  const getGameTypeName = (session: any) => {
-    return session.gameType?.name || 'Unknown';
-  };
-
-  const getPlayerName = (session: any) => {
-    if (session.is_guest && session.guest_player_name) {
-      return session.guest_player_name;
-    }
-    if (session.player) {
-      return `${session.player.first_name || ''} ${session.player.last_name || ''}`.trim() || session.player.phone;
-    }
-    return 'Guest Player';
-  };
-
-  const getSessionDuration = (startTime: string, endTime?: string) => {
-    const start = new Date(startTime).getTime();
-    const end = endTime ? new Date(endTime).getTime() : new Date().getTime();
-    const diff = end - start;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-    return `${hours}h ${minutes}m`;
-  };
-
-  const handleEndSession = async (sessionId: number) => {
-    try {
-      await endSession(sessionId);
-      toast({
-        title: "Session Ended",
-        description: "Session has been completed successfully",
-      });
-      
-      // Refresh data
-      fetchSessionsData();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to end session",
-        variant: "destructive"
-      });
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-500';
+      case 'completed':
+        return 'bg-blue-500';
+      case 'paused':
+        return 'bg-yellow-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
-  const handleCreateInvoice = (sessionId: number) => {
-    // Navigate to invoice creation
-    window.location.href = `/invoice/${sessionId}`;
+  const formatDuration = (minutes: number | null) => {
+    if (!minutes) return 'N/A';
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
+  };
+
+  const formatPrice = (price: any): string => {
+    const numPrice = typeof price === 'number' ? price : parseFloat(price) || 0;
+    return numPrice.toFixed(2);
   };
 
   if (isLoading) {
     return (
       <div className="container mx-auto py-6 px-4">
         <div className="text-center">
-          <Clock className="h-8 w-8 mx-auto mb-4 animate-spin" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Loading sessions...</p>
         </div>
       </div>
@@ -112,154 +102,193 @@ const Sessions = () => {
   }
 
   return (
-    <div className="container mx-auto py-6 px-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Session Management</h1>
-        <div className="flex gap-2 items-center">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={forceRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          <Badge variant="outline" className="bg-blue-50">
-            Active: {activeSessions.length}
-          </Badge>
-          <Badge variant="outline" className="bg-gray-50">
-            Completed: {completedSessions.length}
-          </Badge>
+    <div className="container mx-auto py-6 px-4 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Session Management</h1>
+          <p className="text-muted-foreground">
+            View and manage all gaming sessions
+          </p>
         </div>
       </div>
 
-      <Tabs defaultValue="active" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="active">Active Sessions</TabsTrigger>
-          <TabsTrigger value="completed">Completed Sessions</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="active">
-          {activeSessions.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeSessions.map((session) => (
-                <Card key={session.id} className="border-blue-200 bg-blue-50">
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-lg">{getTableName(session)}</CardTitle>
-                        <CardDescription>{getGameTypeName(session)} Session</CardDescription>
-                        <Badge variant="outline" className="mt-1 text-xs">
-                          {session.session_code}
-                        </Badge>
-                      </div>
-                      <Badge className="bg-blue-500">Active</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4 text-blue-600" />
-                      <span className="font-medium">{getPlayerName(session)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-green-600" />
-                      <span className="font-mono">{getSessionDuration(session.start_time)}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-600" />
-                      <span className="text-sm">{new Date(session.start_time).toLocaleString()}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <DollarSign className="h-4 w-4 text-green-600" />
-                      <span className="font-medium">Rs.{parseFloat(session.total_amount || '0').toFixed(2)}</span>
-                    </div>
-                    <Button 
-                      onClick={() => handleEndSession(session.id)}
-                      className="w-full bg-red-600 hover:bg-red-700"
-                    >
-                      End Session
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium">Total Sessions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{sessions.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-green-600">Active</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {sessions.filter(s => s.status === 'active').length}
             </div>
-          ) : (
-            <Card>
-              <CardContent className="text-center py-12">
-                <Clock className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-500">No active sessions</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-blue-600">Completed</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-blue-600">
+              {sessions.filter(s => s.status === 'completed').length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-purple-600">Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-purple-600">
+              Rs.{sessions.reduce((total, session) => total + parseFloat(session.total_amount || 0), 0).toFixed(2)}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-        <TabsContent value="completed">
-          {completedSessions.length > 0 ? (
-            <Card>
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Session Code</TableHead>
-                      <TableHead>Table</TableHead>
-                      <TableHead>Player</TableHead>
-                      <TableHead>Game Type</TableHead>
-                      <TableHead>Duration</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Date</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {completedSessions.map((session) => (
-                      <TableRow key={session.id}>
-                        <TableCell className="font-medium font-mono text-sm">
-                          {session.session_code}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          {getTableName(session)}
-                        </TableCell>
-                        <TableCell>{getPlayerName(session)}</TableCell>
-                        <TableCell>{getGameTypeName(session)}</TableCell>
-                        <TableCell className="font-mono">
-                          {session.end_time && getSessionDuration(session.start_time, session.end_time)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-1">
-                            <DollarSign className="h-4 w-4" />
-                            Rs.{parseFloat(session.total_amount || '0').toFixed(2)}
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          {new Date(session.start_time).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleCreateInvoice(session.id)}
-                          >
-                            <FileText className="h-4 w-4 mr-1" />
-                            Invoice
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+          <Input
+            placeholder="Search sessions..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40">
+            <Filter className="h-4 w-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="paused">Paused</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Sessions List */}
+      {filteredSessions.length > 0 ? (
+        <div className="grid grid-cols-1 gap-4">
+          {filteredSessions.map((session) => (
+            <Card key={session.id} className="hover:shadow-md transition-shadow">
+              <CardHeader>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      {session.session_code || `Session #${session.id}`}
+                      <Badge className={getStatusColor(session.status)}>
+                        {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
+                      </Badge>
+                    </CardTitle>
+                    <CardDescription>
+                      {session.table?.table_number} • {session.gameType?.name}
+                    </CardDescription>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-lg font-bold text-green-600">
+                      Rs.{formatPrice(session.total_amount)}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {session.payment_status}
+                    </div>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="flex items-center gap-2">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">
+                        {session.is_guest 
+                          ? session.guest_player_name || 'Guest' 
+                          : `${session.player?.first_name || ''} ${session.player?.last_name || ''}`.trim()
+                        }
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {session.player?.phone}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">
+                        {format(new Date(session.start_time), 'MMM dd, yyyy')}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        {format(new Date(session.start_time), 'HH:mm')}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">
+                        {formatDuration(session.duration_minutes)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Duration
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="font-medium">
+                        Game: Rs.{formatPrice(session.game_amount)}
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Canteen: Rs.{formatPrice(session.canteen_amount)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                {session.canteenOrders && session.canteenOrders.length > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="text-sm font-medium mb-2">Canteen Orders:</div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                      {session.canteenOrders.map((order: any, index: number) => (
+                        <div key={index} className="text-sm bg-gray-50 p-2 rounded">
+                          {order.item?.name} x {order.quantity} - Rs.{formatPrice(order.total_price)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
-          ) : (
-            <Card>
-              <CardContent className="text-center py-12">
-                <FileText className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-500">No completed sessions</p>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+          ))}
+        </div>
+      ) : (
+        <Card>
+          <CardContent className="text-center py-12">
+            <p className="text-muted-foreground">
+              {searchQuery || statusFilter !== 'all' 
+                ? 'No sessions match your current filters' 
+                : 'No sessions found'
+              }
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
