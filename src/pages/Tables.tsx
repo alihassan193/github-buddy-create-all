@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Grid3X3, List, Search, Filter } from "lucide-react";
 import { createTable } from "@/services/tableService";
-import { getAllSessions } from "@/services/sessionService";
+import { getActiveSessions } from "@/services/sessionService";
 import EnhancedTableCard from "@/components/EnhancedTableCard";
 import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
@@ -69,7 +69,7 @@ const Tables = () => {
 
     try {
       await createTable({
-        table_number: newTable.table_number, // Keep as string
+        table_number: newTable.table_number,
         table_type: newTable.table_type,
         description: newTable.description || undefined
       });
@@ -153,7 +153,6 @@ const Tables = () => {
                   <Label htmlFor="tableNumber">Table Number</Label>
                   <Input
                     id="tableNumber"
-                    type="number"
                     value={newTable.table_number}
                     onChange={(e) => setNewTable({...newTable, table_number: e.target.value})}
                     placeholder="Enter table number"

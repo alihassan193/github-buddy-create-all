@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { SnookerTable, GameType } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,7 +16,7 @@ interface TableCardProps {
 }
 
 const TableCard = ({ table }: TableCardProps) => {
-  const { gameTypes, gamePricings, refreshTables } = useData();
+  const { gameTypes, gamePricings, refreshTables, clubId } = useData();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [gameTypeId, setGameTypeId] = useState<number | null>(null);
@@ -70,9 +69,11 @@ const TableCard = ({ table }: TableCardProps) => {
         table_id: table.id,
         game_type_id: gameTypeId,
         pricing_id: selectedPricing.id,
-        player_name: playerName.trim(),
+        club_id: clubId || 1,
+        estimated_duration: 120,
         is_guest: !selectedPlayer,
-        ...(selectedPlayer && { player_id: selectedPlayer.id })
+        ...(selectedPlayer && { player_id: selectedPlayer.id }),
+        ...((!selectedPlayer && playerName.trim()) && { guest_player_name: playerName.trim() })
       };
 
       await startSession(sessionData);
