@@ -36,21 +36,32 @@ export const getAllSessions = async (params?: {
   }
 };
 
-// Get active sessions
-export const getActiveSessions = async (): Promise<any[]> => {
+// Get active sessions using the specific active endpoint
+export const getActiveSessions = async (clubId?: number): Promise<any[]> => {
   try {
-    const response = await getAllSessions({ status: 'active' });
-    return response.sessions || [];
+    const queryParams = new URLSearchParams();
+    if (clubId) queryParams.append('club_id', clubId.toString());
+    
+    const response = await apiClient.get(`/api/sessions/active?${queryParams.toString()}`);
+    
+    if (response.success) {
+      return response.data || [];
+    }
+    
+    throw new Error(response.message || 'Failed to fetch active sessions');
   } catch (error) {
     console.error('Error fetching active sessions:', error);
     return [];
   }
 };
 
-// Get completed sessions
-export const getCompletedSessions = async (): Promise<any[]> => {
+// Get completed sessions by filtering all sessions
+export const getCompletedSessions = async (clubId?: number): Promise<any[]> => {
   try {
-    const response = await getAllSessions({ status: 'completed' });
+    const response = await getAllSessions({ 
+      club_id: clubId,
+      status: 'completed' 
+    });
     return response.sessions || [];
   } catch (error) {
     console.error('Error fetching completed sessions:', error);
@@ -74,20 +85,34 @@ export const getSessionById = async (sessionId: number): Promise<any> => {
   }
 };
 
-// Start session
+// Start session with updated structure
 export const startSession = async (sessionData: {
   table_id: number;
   game_type_id: number;
   player_id?: number;
-  player_name?: string;
   guest_player_name?: string;
   guest_player_phone?: string;
   is_guest?: boolean;
-  pricing_id?: number;
+  pricing_id: number;
+  club_id: number;
+  estimated_duration?: number;
   notes?: string;
 }): Promise<any> => {
   try {
-    const response = await apiClient.post('/api/sessions', sessionData);
+    const requestData = {
+      table_id: sessionData.table_id,
+      game_type_id: sessionData.game_type_id,
+      pricing_id: sessionData.pricing_id,
+      club_id: sessionData.club_id,
+      estimated_duration: sessionData.estimated_duration || 120,
+      notes: sessionData.notes,
+      ...(sessionData.player_id && { player_id: sessionData.player_id }),
+      ...(sessionData.guest_player_name && { guest_player_name: sessionData.guest_player_name }),
+      ...(sessionData.guest_player_phone && { guest_player_phone: sessionData.guest_player_phone }),
+      ...(sessionData.is_guest !== undefined && { is_guest: sessionData.is_guest })
+    };
+
+    const response = await apiClient.post('/api/sessions', requestData);
     
     if (response.success) {
       return response.data;
@@ -100,7 +125,7 @@ export const startSession = async (sessionData: {
   }
 };
 
-// Create new session
+// Create new session (alias for startSession for backward compatibility)
 export const createSession = async (sessionData: {
   table_id: number;
   game_type_id: number;
@@ -108,21 +133,12 @@ export const createSession = async (sessionData: {
   guest_player_name?: string;
   guest_player_phone?: string;
   is_guest?: boolean;
-  pricing_id?: number;
+  pricing_id: number;
+  club_id: number;
+  estimated_duration?: number;
   notes?: string;
 }): Promise<any> => {
-  try {
-    const response = await apiClient.post('/api/sessions', sessionData);
-    
-    if (response.success) {
-      return response.data;
-    }
-    
-    throw new Error(response.message || 'Failed to create session');
-  } catch (error) {
-    console.error('Error creating session:', error);
-    throw error;
-  }
+  return startSession(sessionData);
 };
 
 // Update session
@@ -153,9 +169,10 @@ export const updateSession = async (sessionId: number, sessionData: {
 };
 
 // End session
-export const endSession = async (sessionId: number, additionalData?: any): Promise<any> => {
+export const endSession = async (sessionId: number, notes?: string): Promise<any> => {
   try {
-    const response = await apiClient.put(`/api/sessions/${sessionId}/end`, additionalData || {});
+    const requestData = notes ? { notes } : {};
+    const response = await apiClient.post(`/api/sessions/${sessionId}/end`, requestData);
     
     if (response.success) {
       return response.data;
@@ -200,7 +217,7 @@ export const resumeSession = async (sessionId: number): Promise<any> => {
   }
 };
 
-// Add canteen order to session
+// Add canteen order to session using the new endpoint
 export const addCanteenOrderToSession = async (sessionId: number, orderData: {
   items: Array<{
     item_id: number;
@@ -208,7 +225,12 @@ export const addCanteenOrderToSession = async (sessionId: number, orderData: {
   }>;
 }): Promise<any> => {
   try {
-    const response = await apiClient.post(`/api/sessions/${sessionId}/canteen-order`, orderData);
+    const requestData = {
+      session_id: sessionId,
+      items: orderData.items
+    };
+
+    const response = await apiClient.post('/api/canteen/orders', requestData);
     
     if (response.success) {
       return response.data;
@@ -217,6 +239,30 @@ export const addCanteenOrderToSession = async (sessionId: number, orderData: {
     throw new Error(response.message || 'Failed to add canteen order');
   } catch (error) {
     console.error('Error adding canteen order:', error);
+    throw error;
+  }
+};
+
+// Create quick sale for general POS
+export const createQuickSale = async (saleData: {
+  club_id: number;
+  customer_name?: string;
+  payment_method: string;
+  items: Array<{
+    canteen_item_id: number;
+    quantity: number;
+  }>;
+}): Promise<any> => {
+  try {
+    const response = await apiClient.post('/api/canteen/quick-sale', saleData);
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to create quick sale');
+  } catch (error) {
+    console.error('Error creating quick sale:', error);
     throw error;
   }
 };

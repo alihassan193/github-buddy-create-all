@@ -18,7 +18,7 @@ interface TableCardProps {
 }
 
 const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
-  const { gameTypes, gamePricings } = useData();
+  const { gameTypes, gamePricings, clubId } = useData();
   const { toast } = useToast();
   const [showStartDialog, setShowStartDialog] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -126,10 +126,12 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
         table_id: table.id,
         game_type_id: parseInt(gameTypeId),
         pricing_id: parseInt(pricing.id),
+        club_id: clubId || 1,
+        estimated_duration: 120,
         is_guest: !selectedPlayer,
         notes: notes.trim() || undefined,
         ...(selectedPlayer && { player_id: selectedPlayer.id }),
-        ...((!selectedPlayer && playerName.trim()) && { player_name: playerName.trim() })
+        ...((!selectedPlayer && playerName.trim()) && { guest_player_name: playerName.trim() })
       };
 
       await startSession(sessionData);
@@ -164,8 +166,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
 
     setIsEnding(true);
     try {
-      // Fix: endSession now expects only sessionId as first parameter
-      await endSession(activeSession.id);
+      await endSession(activeSession.id, notes.trim() || undefined);
 
       toast({
         title: "Session Ended",

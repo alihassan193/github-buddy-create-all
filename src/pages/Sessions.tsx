@@ -11,7 +11,7 @@ import { getActiveSessions, getCompletedSessions, endSession } from "@/services/
 import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 const Sessions = () => {
-  const { tables, gameTypes } = useData();
+  const { tables, gameTypes, clubId } = useData();
   const { toast } = useToast();
   const [activeSessions, setActiveSessions] = useState<any[]>([]);
   const [completedSessions, setCompletedSessions] = useState<any[]>([]);
@@ -23,8 +23,8 @@ const Sessions = () => {
       setIsRefreshing(true);
       
       const [activeData, completedData] = await Promise.all([
-        getActiveSessions(),
-        getCompletedSessions()
+        getActiveSessions(clubId || 1),
+        getCompletedSessions(clubId || 1)
       ]);
       
       setActiveSessions(activeData);

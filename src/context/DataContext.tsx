@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getAllCanteenItems, getAllCategories } from '@/services/canteenService';
 import { getAllTables } from '@/services/tableService';
@@ -108,11 +107,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }
   };
 
-  // Load sessions data from API
+  // Load sessions data from API with club_id
   const refreshSessions = async () => {
     try {
       console.log('Fetching sessions data...');
-      const sessionsResponse = await getAllSessions();
+      const sessionsResponse = await getAllSessions({ club_id: clubId || 1 });
       console.log('Sessions API response:', sessionsResponse);
       
       // Extract sessions from the response structure

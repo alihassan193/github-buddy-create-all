@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Grid3X3, List, Search, Filter } from "lucide-react";
 import EnhancedTableCard from "@/components/EnhancedTableCard";
-import { getAllSessions } from "@/services/sessionService";
+import { getAllSessions, getActiveSessions } from "@/services/sessionService";
 
 const EnhancedTables = () => {
   const { user } = useAuth();
-  const { tables, refreshTables } = useData();
+  const { tables, refreshTables, clubId } = useData();
   const { toast } = useToast();
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [filterStatus, setFilterStatus] = useState<string>('all');
@@ -26,9 +26,9 @@ const EnhancedTables = () => {
         setIsLoading(true);
         await refreshTables();
         
-        // Fetch active sessions using the new API structure
-        const sessionsResponse = await getAllSessions({ status: 'active' });
-        setActiveSessions(sessionsResponse?.sessions || []);
+        // Fetch active sessions using the correct endpoint with club_id
+        const activeSessionsData = await getActiveSessions(clubId || 1);
+        setActiveSessions(activeSessionsData);
       } catch (error) {
         console.error("Error fetching data:", error);
         toast({
@@ -46,7 +46,7 @@ const EnhancedTables = () => {
     // Refresh every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
-  }, [refreshTables, toast]);
+  }, [refreshTables, toast, clubId]);
 
   const filteredTables = tables.filter(table => {
     const matchesStatus = filterStatus === 'all' || table.status === filterStatus;

@@ -16,7 +16,7 @@ import { useSmartRefresh } from "@/hooks/useSmartRefresh";
 
 const Tables = () => {
   const { user } = useAuth();
-  const { tables, refreshTables } = useData();
+  const { tables, refreshTables, clubId } = useData();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -35,9 +35,9 @@ const Tables = () => {
       setIsLoading(true);
       await refreshTables();
       
-      // Fetch active sessions
-      const sessionsResponse = await getAllSessions({ status: 'active' });
-      setActiveSessions(sessionsResponse?.sessions || []);
+      // Fetch active sessions with club_id
+      const activeSessionsData = await getActiveSessions(clubId || 1);
+      setActiveSessions(activeSessionsData);
     } catch (error) {
       console.error("Error fetching data:", error);
       toast({
