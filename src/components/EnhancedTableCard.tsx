@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Clock, Play, CircleStop, DollarSign, User, Settings } from "lucide-react";
+import { Clock, Play, CircleStop, DollarSign, User, Settings, ShoppingCart } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
 import { startSession, endSession } from "@/services/sessionService";
@@ -22,6 +22,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
   const { toast } = useToast();
   const [showStartDialog, setShowStartDialog] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
+  const [showPOSDialog, setShowPOSDialog] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [playerName, setPlayerName] = useState('');
   const [gameTypeId, setGameTypeId] = useState<string>('');
@@ -214,6 +215,18 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
         </CardHeader>
 
         <CardContent className="space-y-4">
+          {/* Snooker table background */}
+          <div 
+            className="relative h-32 rounded-lg bg-cover bg-center bg-no-repeat"
+            style={{ 
+              backgroundImage: `url('/lovable-uploads/a40fb048-a62d-4857-ba5b-d25bdb9d95cd.png')`,
+              backgroundSize: 'cover',
+              backgroundPosition: 'center'
+            }}
+          >
+            <div className="absolute inset-0 bg-black bg-opacity-20 rounded-lg"></div>
+          </div>
+
           {activeSession ? (
             // Active session display
             <div className="space-y-3">
@@ -247,8 +260,12 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
                   <CircleStop className="h-4 w-4 mr-2" />
                   End Session
                 </Button>
-                <Button variant="outline" size="icon">
-                  <Settings className="h-4 w-4" />
+                <Button 
+                  variant="outline" 
+                  size="icon"
+                  onClick={() => setShowPOSDialog(true)}
+                >
+                  <ShoppingCart className="h-4 w-4" />
                 </Button>
               </div>
             </div>
@@ -358,6 +375,23 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
                 {isEnding ? 'Ending...' : 'End Session'}
               </Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* POS Dialog for Session Orders */}
+      <Dialog open={showPOSDialog} onOpenChange={setShowPOSDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Items to Session</DialogTitle>
+          </DialogHeader>
+          <div className="text-center p-4">
+            <p className="text-muted-foreground mb-4">
+              POS functionality for session orders will be implemented here.
+            </p>
+            <Button variant="outline" onClick={() => setShowPOSDialog(false)}>
+              Close
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

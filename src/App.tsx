@@ -15,6 +15,7 @@ import Sessions from "./pages/Sessions";
 import Reports from "./pages/Reports";
 import ActiveGame from "./pages/ActiveGame";
 import Invoice from "./pages/Invoice";
+import Invoices from "./pages/Invoices";
 import Admin from "./pages/Admin";
 import Canteen from "./pages/Canteen";
 import NotFound from "./pages/NotFound";
@@ -96,6 +97,7 @@ const AppRoutes = () => {
       <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/tables" element={<PrivateRoute><Tables /></PrivateRoute>} />
       <Route path="/sessions" element={<PrivateRoute><Sessions /></PrivateRoute>} />
+      <Route path="/invoices" element={<PrivateRoute><Invoices /></PrivateRoute>} />
       <Route path="/game/:gameId" element={<PrivateRoute><ActiveGame /></PrivateRoute>} />
       <Route path="/invoice/:invoiceId" element={<PrivateRoute><Invoice /></PrivateRoute>} />
       <Route path="/canteen" element={<PrivateRoute><Canteen /></PrivateRoute>} />
