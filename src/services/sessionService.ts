@@ -1,4 +1,3 @@
-
 import { apiClient } from './apiClient';
 
 // Get all sessions - matches /api/sessions endpoint
@@ -81,6 +80,48 @@ export const getSessionById = async (sessionId: number): Promise<any> => {
     throw new Error(response.message || 'Failed to fetch session');
   } catch (error) {
     console.error('Error fetching session:', error);
+    throw error;
+  }
+};
+
+// Start two-player session with updated structure
+export const startTwoPlayerSession = async (sessionData: {
+  table_id: number;
+  game_type_id: number;
+  player_id: number;
+  player_2_id: number;
+  pricing_id: number;
+  club_id: number;
+}): Promise<any> => {
+  try {
+    const response = await apiClient.post('/api/sessions', sessionData);
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to start session');
+  } catch (error) {
+    console.error('Error starting session:', error);
+    throw error;
+  }
+};
+
+// Announce game result
+export const announceGameResult = async (sessionId: number, winnerPlayer: 'player_1' | 'player_2', loserPlayer: 'player_1' | 'player_2'): Promise<any> => {
+  try {
+    const response = await apiClient.put(`/api/sessions/${sessionId}/announce-result`, {
+      winner_player: winnerPlayer,
+      loser_player: loserPlayer
+    });
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to announce result');
+  } catch (error) {
+    console.error('Error announcing result:', error);
     throw error;
   }
 };

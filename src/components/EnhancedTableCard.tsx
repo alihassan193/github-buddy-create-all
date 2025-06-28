@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,11 +7,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Clock, Play, CircleStop, DollarSign, User, Settings, ShoppingCart } from "lucide-react";
+import { Clock, Play, CircleStop, DollarSign, User, ShoppingCart, Trophy, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
-import { startSession, endSession } from "@/services/sessionService";
-import PlayerSearchInput from "./PlayerSearchInput";
+import { startTwoPlayerSession, endSession, announceGameResult } from "@/services/sessionService";
+import PlayerPairSearchInput from "./PlayerPairSearchInput";
+import SessionPOSDialog from "./SessionPOSDialog";
 
 interface TableCardProps {
   table: any;
@@ -22,15 +24,18 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
   const { toast } = useToast();
   const [showStartDialog, setShowStartDialog] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
+  const [showResultDialog, setShowResultDialog] = useState(false);
   const [showPOSDialog, setShowPOSDialog] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
-  const [playerName, setPlayerName] = useState('');
+  const [selectedPlayer1, setSelectedPlayer1] = useState<any>(null);
+  const [selectedPlayer2, setSelectedPlayer2] = useState<any>(null);
   const [gameTypeId, setGameTypeId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isStarting, setIsStarting] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
+  const [isAnnouncingResult, setIsAnnouncingResult] = useState(false);
   const [sessionTimer, setSessionTimer] = useState<string>('00:00:00');
   const [sessionCost, setSessionCost] = useState<number>(0);
+  const [winner, setWinner] = useState<'player_1' | 'player_2' | ''>('');
 
   // Find active session for this table
   const activeSession = activeSessions.find(session => session.table_id === table.id);
@@ -97,10 +102,10 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
       return;
     }
 
-    if (!selectedPlayer && !playerName.trim()) {
+    if (!selectedPlayer1 || !selectedPlayer2) {
       toast({
         title: "Error",
-        description: "Please select or enter a player name",
+        description: "Please select both players",
         variant: "destructive"
       });
       return;
@@ -126,25 +131,22 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
       const sessionData = {
         table_id: table.id,
         game_type_id: parseInt(gameTypeId),
+        player_id: selectedPlayer1.id,
+        player_2_id: selectedPlayer2.id,
         pricing_id: parseInt(pricing.id),
-        club_id: clubId || 1,
-        estimated_duration: 120,
-        is_guest: !selectedPlayer,
-        notes: notes.trim() || undefined,
-        ...(selectedPlayer && { player_id: selectedPlayer.id }),
-        ...((!selectedPlayer && playerName.trim()) && { guest_player_name: playerName.trim() })
+        club_id: clubId || 1
       };
 
-      await startSession(sessionData);
+      await startTwoPlayerSession(sessionData);
       
       toast({
         title: "Session Started",
-        description: `Session started for ${selectedPlayer ? `${selectedPlayer.first_name} ${selectedPlayer.last_name}` : playerName}`,
+        description: `Session started for ${selectedPlayer1.first_name} ${selectedPlayer1.last_name} vs ${selectedPlayer2.first_name} ${selectedPlayer2.last_name}`,
       });
 
       // Reset form
-      setSelectedPlayer(null);
-      setPlayerName('');
+      setSelectedPlayer1(null);
+      setSelectedPlayer2(null);
       setGameTypeId('');
       setNotes('');
       setShowStartDialog(false);
@@ -159,6 +161,42 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
       });
     } finally {
       setIsStarting(false);
+    }
+  };
+
+  const handleAnnounceResult = async () => {
+    if (!winner) {
+      toast({
+        title: "Error",
+        description: "Please select a winner",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsAnnouncingResult(true);
+    try {
+      const loser = winner === 'player_1' ? 'player_2' : 'player_1';
+      await announceGameResult(activeSession.id, winner, loser);
+
+      toast({
+        title: "Result Announced",
+        description: `Winner: ${winner === 'player_1' ? 'Player 1' : 'Player 2'}`,
+      });
+
+      setShowResultDialog(false);
+      setWinner('');
+      
+      // Show end session dialog after announcing result
+      setTimeout(() => setShowEndDialog(true), 500);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to announce result",
+        variant: "destructive"
+      });
+    } finally {
+      setIsAnnouncingResult(false);
     }
   };
 
@@ -190,9 +228,18 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
     }
   };
 
-  const handlePlayerSelect = (player: any, name: string) => {
-    setSelectedPlayer(player);
-    setPlayerName(name);
+  const handlePlayersSelect = (player1: any, player2: any) => {
+    setSelectedPlayer1(player1);
+    setSelectedPlayer2(player2);
+  };
+
+  const getPlayerNames = () => {
+    if (!activeSession) return '';
+    
+    const player1Name = activeSession.player ? `${activeSession.player.first_name} ${activeSession.player.last_name}` : 'Player 1';
+    const player2Name = activeSession.player2 ? `${activeSession.player2.first_name} ${activeSession.player2.last_name}` : 'Player 2';
+    
+    return `${player1Name} vs ${player2Name}`;
   };
 
   return (
@@ -215,30 +262,28 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Snooker table background */}
+          {/* Snooker table background with better styling */}
           <div 
-            className="relative h-32 rounded-lg bg-cover bg-center bg-no-repeat"
+            className="relative h-32 rounded-lg bg-cover bg-center bg-no-repeat shadow-inner"
             style={{ 
               backgroundImage: `url('/lovable-uploads/a40fb048-a62d-4857-ba5b-d25bdb9d95cd.png')`,
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
           >
-            <div className="absolute inset-0 bg-black bg-opacity-20 rounded-lg"></div>
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent rounded-lg"></div>
+            <div className="absolute bottom-2 left-2 text-white font-semibold text-sm drop-shadow-lg">
+              Table {table.table_number}
+            </div>
           </div>
 
           {activeSession ? (
             // Active session display
             <div className="space-y-3">
               <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-blue-600" />
-                <span className="font-medium">
-                  {activeSession.is_guest && activeSession.guest_player_name 
-                    ? activeSession.guest_player_name
-                    : activeSession.player 
-                    ? `${activeSession.player.first_name || ''} ${activeSession.player.last_name || ''}`.trim()
-                    : 'Guest Player'
-                  }
+                <Users className="h-4 w-4 text-blue-600" />
+                <span className="font-medium text-sm">
+                  {getPlayerNames()}
                 </span>
               </div>
               
@@ -254,11 +299,12 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
               
               <div className="flex gap-2">
                 <Button 
-                  onClick={() => setShowEndDialog(true)}
-                  className="flex-1 bg-red-600 hover:bg-red-700"
+                  onClick={() => setShowResultDialog(true)}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  disabled={activeSession.game_result_announced}
                 >
-                  <CircleStop className="h-4 w-4 mr-2" />
-                  End Session
+                  <Trophy className="h-4 w-4 mr-2" />
+                  {activeSession.game_result_announced ? 'Result Announced' : 'Announce Winner'}
                 </Button>
                 <Button 
                   variant="outline" 
@@ -268,6 +314,16 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
                   <ShoppingCart className="h-4 w-4" />
                 </Button>
               </div>
+              
+              {activeSession.game_result_announced && (
+                <Button 
+                  onClick={() => setShowEndDialog(true)}
+                  className="w-full bg-red-600 hover:bg-red-700"
+                >
+                  <CircleStop className="h-4 w-4 mr-2" />
+                  End Session
+                </Button>
+              )}
             </div>
           ) : (
             // Available table display
@@ -291,15 +347,12 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
 
       {/* Start Session Dialog */}
       <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Start Session - Table {table.table_number}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            <PlayerSearchInput 
-              onPlayerSelect={handlePlayerSelect}
-              placeholder="Search or enter player name..."
-            />
+            <PlayerPairSearchInput onPlayersSelect={handlePlayersSelect} />
             
             <div className="space-y-2">
               <Label>Game Type</Label>
@@ -310,21 +363,11 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
                 <SelectContent>
                   {gameTypes.map((gameType) => (
                     <SelectItem key={gameType.id} value={gameType.id.toString()}>
-                      {gameType.name} - {gameType.pricing_type === 'fixed' ? 'Fixed Price' : 'Per Minute'}
+                      {gameType.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Notes (Optional)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes..."
-                rows={3}
-              />
             </div>
 
             <div className="flex gap-2 pt-4">
@@ -333,6 +376,46 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
               </Button>
               <Button onClick={handleStartSession} disabled={isStarting} className="flex-1">
                 {isStarting ? 'Starting...' : 'Start Session'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Announce Result Dialog */}
+      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Announce Winner - Table {table.table_number}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Winner</Label>
+              <Select value={winner} onValueChange={(value: 'player_1' | 'player_2') => setWinner(value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose the winner" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="player_1">
+                    Player 1: {activeSession?.player ? `${activeSession.player.first_name} ${activeSession.player.last_name}` : 'Player 1'}
+                  </SelectItem>
+                  <SelectItem value="player_2">
+                    Player 2: {activeSession?.player2 ? `${activeSession.player2.first_name} ${activeSession.player2.last_name}` : 'Player 2'}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex gap-2 pt-4">
+              <Button variant="outline" onClick={() => setShowResultDialog(false)} className="flex-1">
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleAnnounceResult} 
+                disabled={isAnnouncingResult} 
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
+                {isAnnouncingResult ? 'Announcing...' : 'Announce Winner'}
               </Button>
             </div>
           </div>
@@ -379,22 +462,16 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
         </DialogContent>
       </Dialog>
 
-      {/* POS Dialog for Session Orders */}
-      <Dialog open={showPOSDialog} onOpenChange={setShowPOSDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add Items to Session</DialogTitle>
-          </DialogHeader>
-          <div className="text-center p-4">
-            <p className="text-muted-foreground mb-4">
-              POS functionality for session orders will be implemented here.
-            </p>
-            <Button variant="outline" onClick={() => setShowPOSDialog(false)}>
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Session POS Dialog */}
+      <SessionPOSDialog
+        open={showPOSDialog}
+        onOpenChange={setShowPOSDialog}
+        sessionId={activeSession?.id}
+        sessionInfo={{
+          table_number: `Table ${table.table_number}`,
+          player_names: getPlayerNames()
+        }}
+      />
     </>
   );
 };
