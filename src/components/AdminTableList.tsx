@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+
+import { useState, useEffect, useCallback } from "react";
 import { useData } from "@/context/DataContext";
 import {
   Table,
@@ -19,18 +20,18 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { SnookerTable, GamePricing, GameType } from "@/types";
+import { SnookerTable, GameType } from "@/types";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import {
   createTable,
   deleteTable,
   updateTablePricing,
+  getTablePricing,
 } from "@/services/tableService";
 
 const AdminTableList = () => {
-  const { tables, gameTypes, gamePricings, refreshTables, refreshGameTypes } =
-    useData();
+  const { tables, gameTypes, clubId, refreshTables } = useData();
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -39,16 +40,28 @@ const AdminTableList = () => {
   const [newTable, setNewTable] = useState<Partial<SnookerTable>>({
     table_number: "",
   });
-  const [pricings, setPricings] = useState<Partial<GamePricing>[]>([]);
+  const [pricings, setPricings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
 
-  // Load initial data
+  // Load initial data only once
+  const loadData = useCallback(async () => {
+    if (!initialLoadDone && clubId) {
+      setIsLoading(true);
+      try {
+        await refreshTables();
+      } catch (error) {
+        console.error('Error loading data:', error);
+      } finally {
+        setIsLoading(false);
+        setInitialLoadDone(true);
+      }
+    }
+  }, [refreshTables, clubId, initialLoadDone]);
+
   useEffect(() => {
-    const loadData = async () => {
-      await Promise.all([refreshTables(), refreshGameTypes()]);
-    };
     loadData();
-  }, [refreshTables, refreshGameTypes]);
+  }, [loadData]);
 
   const handleOpenNewDialog = () => {
     setSelectedTable(null);
@@ -58,35 +71,54 @@ const AdminTableList = () => {
     setDialogOpen(true);
   };
 
-  const handleOpenPricingDialog = (table: SnookerTable) => {
+  const handleOpenPricingDialog = async (table: SnookerTable) => {
     setSelectedTable(table);
+    setIsLoading(true);
+    
+    try {
+      // Get existing pricing from API
+      const existingPricings = await getTablePricing(table.id, clubId || 1);
+      console.log('Existing pricings:', existingPricings);
+      
+      // Create pricing entries for each game type
+      const initialPricings = gameTypes.map((gameType) => {
+        const existing = existingPricings.find((p: any) => p.game_type_id === gameType.id);
+        
+        if (existing) {
+          return {
+            ...existing,
+            price: parseFloat(existing.price) || 0,
+            fixed_price: existing.fixed_price ? parseFloat(existing.fixed_price) : null,
+            price_per_minute: existing.price_per_minute ? parseFloat(existing.price_per_minute) : null,
+          };
+        } else {
+          // Default pricing based on game type
+          return {
+            table_id: table.id,
+            game_type_id: gameType.id,
+            game_type: gameType,
+            price: gameType.pricing_type === 'fixed' ? 200 : 15,
+            fixed_price: gameType.pricing_type === 'fixed' ? 200 : null,
+            price_per_minute: gameType.pricing_type === 'per_minute' ? 15 : null,
+            time_limit_minutes: gameType.pricing_type === 'fixed' ? 30 : null,
+            is_unlimited_time: gameType.pricing_type === 'per_minute',
+            is_active: false, // New pricing starts as inactive
+          };
+        }
+      });
 
-    // Load existing pricing or create defaults for each game type
-    const tablePricings = gamePricings
-      .filter((p) => p.table_id === table.id)
-      .reduce((acc, pricing) => {
-        acc[pricing.game_type_id] = pricing;
-        return acc;
-      }, {} as Record<number, GamePricing>);
-
-    const initialPricings = gameTypes.map((gameType) => {
-      const existing = tablePricings[gameType.id];
-
-      if (existing) {
-        return existing;
-      } else {
-        return {
-          table_id: table.id,
-          game_type_id: gameType.id,
-          price: 0,
-          time_limit_minutes: null,
-          is_unlimited: true,
-        };
-      }
-    });
-
-    setPricings(initialPricings);
-    setPricingDialogOpen(true);
+      setPricings(initialPricings);
+      setPricingDialogOpen(true);
+    } catch (error) {
+      console.error('Error loading pricing:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pricing data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSaveTable = async () => {
@@ -104,6 +136,7 @@ const AdminTableList = () => {
       await createTable({
         table_number: newTable.table_number,
         table_type: "standard",
+        club_id: clubId || 1,
       });
 
       await refreshTables();
@@ -126,16 +159,15 @@ const AdminTableList = () => {
   };
 
   const handleSavePricing = async () => {
-    if (!selectedTable) return;
+    if (!selectedTable || !clubId) return;
 
-    // Filter out any pricing with price <= 0
-    const validPricings = pricings.filter((p) => (p.price || 0) > 0);
+    // Filter out inactive pricings
+    const activePricings = pricings.filter((p) => p.is_active);
 
-    if (validPricings.length === 0) {
+    if (activePricings.length === 0) {
       toast({
-        title: "No Valid Pricing",
-        description:
-          "Please add at least one valid pricing with a price greater than 0",
+        title: "No Active Pricing",
+        description: "Please activate at least one game type pricing",
         variant: "destructive",
       });
       return;
@@ -143,14 +175,21 @@ const AdminTableList = () => {
 
     setIsLoading(true);
     try {
-      const pricingData = validPricings.map((pricing) => ({
-        game_type_id: pricing.game_type_id!,
-        price: pricing.price!,
-        time_limit_minutes: pricing.time_limit_minutes || undefined,
-        is_unlimited: pricing.is_unlimited || false,
-      }));
+      // Update each active pricing
+      for (const pricing of activePricings) {
+        const pricingData = {
+          club_id: clubId,
+          game_type_id: pricing.game_type_id,
+          price: pricing.price,
+          fixed_price: pricing.fixed_price,
+          price_per_minute: pricing.price_per_minute,
+          time_limit_minutes: pricing.time_limit_minutes,
+          is_unlimited_time: pricing.is_unlimited_time || false,
+        };
 
-      await updateTablePricing(selectedTable.id, pricingData);
+        await updateTablePricing(selectedTable.id, pricingData);
+      }
+
       await refreshTables();
 
       toast({
@@ -193,16 +232,10 @@ const AdminTableList = () => {
     }
   };
 
-  const updatePricingField = (
-    gameTypeId: number,
-    field: keyof GamePricing,
-    value: any
-  ) => {
-    setPricings(
-      pricings.map((p) =>
-        p.game_type_id === gameTypeId ? { ...p, [field]: value } : p
-      )
-    );
+  const updatePricingField = (gameTypeId: number, field: string, value: any) => {
+    setPricings(pricings.map((p) =>
+      p.game_type_id === gameTypeId ? { ...p, [field]: value } : p
+    ));
   };
 
   return (
@@ -225,13 +258,9 @@ const AdminTableList = () => {
           </TableHeader>
           <TableBody>
             {tables.map((table) => {
-              // Get pricing for this table
-              const tablePricings = gamePricings.filter(
-                (p) => p.table_id === table.id
-              );
-              const gameTypesWithPricing = gameTypes.filter((gt) =>
-                tablePricings.some((tp) => tp.game_type_id === gt.id)
-              );
+              // Get pricing for this table from table.pricings array
+              const tablePricings = table.pricings || [];
+              const gameTypesWithPricing = tablePricings.map((tp: any) => tp.game_type).filter(Boolean);
 
               return (
                 <TableRow key={table.id}>
@@ -254,12 +283,12 @@ const AdminTableList = () => {
                   <TableCell>
                     {gameTypesWithPricing.length > 0 ? (
                       <div className="flex flex-wrap gap-1">
-                        {gameTypesWithPricing.map((gt) => (
+                        {gameTypesWithPricing.map((gt: any, index: number) => (
                           <span
-                            key={gt.id}
+                            key={gt?.id || index}
                             className="inline-block px-2 py-1 text-xs bg-gray-100 rounded-full"
                           >
-                            {gt.name}
+                            {gt?.name || 'Unknown'}
                           </span>
                         ))}
                       </div>
@@ -297,14 +326,18 @@ const AdminTableList = () => {
         </Table>
       ) : (
         <div className="text-center py-10 border rounded-md">
-          <p className="text-muted-foreground">No tables found.</p>
-          <Button
-            onClick={handleOpenNewDialog}
-            className="mt-4"
-            disabled={isLoading}
-          >
-            Add your first table
-          </Button>
+          <p className="text-muted-foreground">
+            {isLoading ? "Loading tables..." : "No tables found."}
+          </p>
+          {!isLoading && (
+            <Button
+              onClick={handleOpenNewDialog}
+              className="mt-4"
+              disabled={isLoading}
+            >
+              Add your first table
+            </Button>
+          )}
         </div>
       )}
 
@@ -319,12 +352,12 @@ const AdminTableList = () => {
               <Label htmlFor="tableNumber">Table Number</Label>
               <Input
                 id="tableNumber"
-                type="number"
+                type="text"
                 value={newTable.table_number}
                 onChange={(e) =>
                   setNewTable({ ...newTable, table_number: e.target.value })
                 }
-                placeholder="e.g. 1"
+                placeholder="e.g. 001"
                 disabled={isLoading}
               />
             </div>
@@ -367,8 +400,7 @@ const AdminTableList = () => {
               </TabsList>
 
               {gameTypes.map((gameType) => {
-                const pricing =
-                  pricings.find((p) => p.game_type_id === gameType.id) || {};
+                const pricing = pricings.find((p) => p.game_type_id === gameType.id) || {};
 
                 return (
                   <TabsContent key={gameType.id} value={gameType.id.toString()}>
@@ -379,75 +411,110 @@ const AdminTableList = () => {
                         </Label>
                         <Switch
                           id={`enable-${gameType.id}`}
-                          checked={(pricing.price || 0) > 0}
+                          checked={pricing.is_active || false}
                           onCheckedChange={(checked) => {
-                            updatePricingField(
-                              gameType.id,
-                              "price",
-                              checked ? 10 : 0
-                            );
+                            updatePricingField(gameType.id, "is_active", checked);
                           }}
                         />
                       </div>
 
-                      {(pricing.price || 0) > 0 && (
+                      {pricing.is_active && (
                         <>
-                          <div className="grid gap-2">
-                            <Label htmlFor={`price-${gameType.id}`}>
-                              Price (Rs)
-                            </Label>
-                            <Input
-                              id={`price-${gameType.id}`}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={pricing.price || ""}
-                              onChange={(e) =>
-                                updatePricingField(
-                                  gameType.id,
-                                  "price",
-                                  parseFloat(e.target.value)
-                                )
-                              }
-                            />
-                          </div>
+                          {gameType.pricing_type === 'fixed' ? (
+                            // Fixed pricing (Frames)
+                            <>
+                              <div className="grid gap-2">
+                                <Label htmlFor={`fixed-price-${gameType.id}`}>
+                                  Fixed Price (Rs)
+                                </Label>
+                                <Input
+                                  id={`fixed-price-${gameType.id}`}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={pricing.fixed_price || ""}
+                                  onChange={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    updatePricingField(gameType.id, "fixed_price", value);
+                                    updatePricingField(gameType.id, "price", value);
+                                  }}
+                                />
+                              </div>
 
-                          <div className="flex items-center justify-between">
-                            <Label htmlFor={`unlimited-${gameType.id}`}>
-                              Unlimited Time
-                            </Label>
-                            <Switch
-                              id={`unlimited-${gameType.id}`}
-                              checked={pricing.is_unlimited}
-                              onCheckedChange={(checked) => {
-                                updatePricingField(
-                                  gameType.id,
-                                  "is_unlimited",
-                                  checked
-                                );
-                              }}
-                            />
-                          </div>
+                              <div className="grid gap-2">
+                                <Label htmlFor={`time-limit-${gameType.id}`}>
+                                  Time Limit (minutes)
+                                </Label>
+                                <Input
+                                  id={`time-limit-${gameType.id}`}
+                                  type="number"
+                                  min="1"
+                                  value={pricing.time_limit_minutes || ""}
+                                  onChange={(e) =>
+                                    updatePricingField(
+                                      gameType.id,
+                                      "time_limit_minutes",
+                                      parseInt(e.target.value) || null
+                                    )
+                                  }
+                                />
+                              </div>
+                            </>
+                          ) : (
+                            // Per minute pricing (Century)
+                            <>
+                              <div className="grid gap-2">
+                                <Label htmlFor={`per-minute-price-${gameType.id}`}>
+                                  Price per Minute (Rs)
+                                </Label>
+                                <Input
+                                  id={`per-minute-price-${gameType.id}`}
+                                  type="number"
+                                  step="0.01"
+                                  min="0"
+                                  value={pricing.price_per_minute || ""}
+                                  onChange={(e) => {
+                                    const value = parseFloat(e.target.value);
+                                    updatePricingField(gameType.id, "price_per_minute", value);
+                                    updatePricingField(gameType.id, "price", value);
+                                  }}
+                                />
+                              </div>
 
-                          {!pricing.is_unlimited && (
-                            <div className="grid gap-2">
-                              <Label htmlFor={`time-${gameType.id}`}>
-                                Time Limit (minutes)
-                              </Label>
-                              <Input
-                                id={`time-${gameType.id}`}
-                                type="number"
-                                min="1"
-                                value={pricing.time_limit_minutes || ""}
-                                onChange={(e) =>
-                                  updatePricingField(
-                                    gameType.id,
-                                    "time_limit_minutes",
-                                    parseInt(e.target.value)
-                                  )
-                                }
-                              />
-                            </div>
+                              <div className="flex items-center justify-between">
+                                <Label htmlFor={`unlimited-${gameType.id}`}>
+                                  Unlimited Time
+                                </Label>
+                                <Switch
+                                  id={`unlimited-${gameType.id}`}
+                                  checked={pricing.is_unlimited_time || false}
+                                  onCheckedChange={(checked) => {
+                                    updatePricingField(gameType.id, "is_unlimited_time", checked);
+                                  }}
+                                />
+                              </div>
+
+                              {!pricing.is_unlimited_time && (
+                                <div className="grid gap-2">
+                                  <Label htmlFor={`time-limit-${gameType.id}`}>
+                                    Time Limit (minutes)
+                                  </Label>
+                                  <Input
+                                    id={`time-limit-${gameType.id}`}
+                                    type="number"
+                                    min="1"
+                                    value={pricing.time_limit_minutes || ""}
+                                    onChange={(e) =>
+                                      updatePricingField(
+                                        gameType.id,
+                                        "time_limit_minutes",
+                                        parseInt(e.target.value) || null
+                                      )
+                                    }
+                                  />
+                                </div>
+                              )}
+                            </>
                           )}
                         </>
                       )}

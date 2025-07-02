@@ -44,6 +44,24 @@ export const getTableById = async (tableId: number): Promise<any> => {
   }
 };
 
+// Get table pricing - matches /api/tables/:tableId/pricing endpoint
+export const getTablePricing = async (tableId: number, clubId: number): Promise<any[]> => {
+  try {
+    const response = await apiClient.get(`/api/tables/${tableId}/pricing`, {
+      club_id: clubId
+    });
+    
+    if (response.success) {
+      return response.data || [];
+    }
+    
+    throw new Error(response.message || 'Failed to fetch table pricing');
+  } catch (error) {
+    console.error('Error fetching table pricing:', error);
+    throw error;
+  }
+};
+
 // Create new table
 export const createTable = async (tableData: {
   table_number: string | number;
@@ -93,15 +111,18 @@ export const updateTable = async (tableId: number, tableData: {
   }
 };
 
-// Update table pricing
-export const updateTablePricing = async (tableId: number, pricingData: Array<{
+// Update table pricing - matches /api/tables/:tableId/pricing endpoint
+export const updateTablePricing = async (tableId: number, pricingData: {
+  club_id: number;
   game_type_id: number;
   price: number;
-  time_limit_minutes?: number;
-  is_unlimited?: boolean;
-}>): Promise<any> => {
+  fixed_price?: number | null;
+  price_per_minute?: number | null;
+  time_limit_minutes?: number | null;
+  is_unlimited_time: boolean;
+}): Promise<any> => {
   try {
-    const response = await apiClient.put(`/api/tables/${tableId}/pricing`, { pricing: pricingData });
+    const response = await apiClient.put(`/api/tables/${tableId}/pricing`, pricingData);
     
     if (response.success) {
       return response.data;

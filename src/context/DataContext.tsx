@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { getAllCanteenItems, getAllCategories } from '@/services/canteenService';
 import { getAllTables } from '@/services/tableService';
@@ -17,7 +18,7 @@ interface DataContextType {
   // Game Types
   gameTypes: any[];
   
-  // Missing properties that components expect
+  // Game pricings from table data
   gamePricings: any[];
   games: any[];
   completedSessions: any[];
@@ -52,10 +53,10 @@ interface DataProviderProps {
 
 // Fallback data for when API calls fail
 const FALLBACK_TABLES = [
-  { id: 1, table_number: "1", status: "available", table_type: "standard" },
-  { id: 2, table_number: "2", status: "occupied", table_type: "premium" },
-  { id: 3, table_number: "3", status: "available", table_type: "standard" },
-  { id: 4, table_number: "4", status: "maintenance", table_type: "vip" },
+  { id: 1, table_number: "1", status: "available", table_type: "standard", pricings: [] },
+  { id: 2, table_number: "2", status: "occupied", table_type: "premium", pricings: [] },
+  { id: 3, table_number: "3", status: "available", table_type: "standard", pricings: [] },
+  { id: 4, table_number: "4", status: "maintenance", table_type: "vip", pricings: [] },
 ];
 
 const FALLBACK_GAME_TYPES = [
@@ -70,9 +71,9 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const [canteenCategories, setCanteenCategories] = useState<any[]>([]);
   const [gameTypes, setGameTypes] = useState<any[]>(FALLBACK_GAME_TYPES);
   const [isLoading, setIsLoading] = useState(false);
+  const [gamePricings, setGamePricings] = useState<any[]>([]);
   
   // Additional state for missing properties
-  const [gamePricings, setGamePricings] = useState<any[]>([]);
   const [games, setGames] = useState<any[]>([]);
   const [completedSessions, setCompletedSessions] = useState<any[]>([]);
   const [canteenOrders, setCanteenOrders] = useState<any[]>([]);
@@ -98,9 +99,51 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const refreshTables = async () => {
     try {
       console.log('Fetching tables data...');
-      const tablesData = await getAllTables();
+      const tablesData = await getAllTables({ club_id: clubId || 1 });
       console.log('Tables API response:', tablesData);
-      setTables(tablesData || FALLBACK_TABLES);
+      
+      // Extract pricings from each table and flatten them
+      const allPricings: any[] = [];
+      const processedTables = tablesData.map((table: any) => {
+        // Add table pricings to the global pricings array
+        if (table.pricings && Array.isArray(table.pricings)) {
+          table.pricings.forEach((pricing: any) => {
+            allPricings.push({
+              ...pricing,
+              id: pricing.id,
+              table_id: table.id,
+              game_type_id: pricing.game_type_id,
+              price: parseFloat(pricing.price) || 0,
+              fixed_price: pricing.fixed_price ? parseFloat(pricing.fixed_price) : null,
+              price_per_minute: pricing.price_per_minute ? parseFloat(pricing.price_per_minute) : null,
+              time_limit_minutes: pricing.time_limit_minutes,
+              is_unlimited: pricing.is_unlimited_time || false
+            });
+          });
+        }
+        return table;
+      });
+      
+      setTables(processedTables || FALLBACK_TABLES);
+      setGamePricings(allPricings);
+      
+      // Update game types from pricing data
+      const uniqueGameTypes = new Set();
+      allPricings.forEach((pricing: any) => {
+        if (pricing.game_type) {
+          uniqueGameTypes.add(JSON.stringify({
+            id: pricing.game_type.id,
+            name: pricing.game_type.name,
+            pricing_type: pricing.game_type.pricing_type
+          }));
+        }
+      });
+      
+      const gameTypesFromPricing = Array.from(uniqueGameTypes).map((gt: any) => JSON.parse(gt));
+      if (gameTypesFromPricing.length > 0) {
+        setGameTypes(gameTypesFromPricing);
+      }
+      
     } catch (error) {
       console.error('Error loading tables:', error);
       setTables(FALLBACK_TABLES);
@@ -166,7 +209,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }
   }, [clubId]);
 
-  // Load initial data
+  // Load initial data only once
   useEffect(() => {
     const loadInitialData = async () => {
       setIsLoading(true);
@@ -182,29 +225,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       }
     };
 
-    loadInitialData();
-  }, []);
-
-  // Generate mock pricings once
-  useEffect(() => {
-    const mockPricings: any[] = [];
-    FALLBACK_TABLES.forEach(table => {
-      FALLBACK_GAME_TYPES.forEach(gameType => {
-        mockPricings.push({
-          id: `${table.id}-${gameType.id}`,
-          table_id: table.id,
-          game_type_id: gameType.id,
-          price: gameType.pricing_type === 'fixed' ? 100 : 5,
-          is_unlimited: gameType.pricing_type === 'fixed',
-          time_limit_minutes: gameType.pricing_type === 'fixed' ? null : 60
-        });
-      });
-    });
-    setGamePricings(mockPricings);
-  }, []);
+    if (clubId) {
+      loadInitialData();
+    }
+  }, [clubId]); // Only depend on clubId to prevent infinite calls
 
   const refreshGameTypes = async () => {
-    // Use static data, no API calls
+    // Game types are now loaded from table pricing data
     return Promise.resolve();
   };
 

@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +19,7 @@ interface TableCardProps {
 }
 
 const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
-  const { gameTypes, gamePricings, clubId } = useData();
+  const { gameTypes, clubId } = useData();
   const { toast } = useToast();
   const [showStartDialog, setShowStartDialog] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -40,6 +39,9 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
   // Find active session for this table
   const activeSession = activeSessions.find(session => session.table_id === table.id);
 
+  // Get table pricings from the table object
+  const tablePricings = table.pricings || [];
+
   // Update timer and cost for active sessions
   useEffect(() => {
     if (!activeSession) return;
@@ -55,18 +57,16 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
       
       setSessionTimer(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
       
-      // Calculate cost based on pricing
-      const pricing = gamePricings.find(p => 
-        p.table_id === table.id && 
-        p.game_type_id === activeSession.game_type_id
-      );
-      
-      if (pricing) {
-        if (pricing.is_unlimited) {
-          setSessionCost(pricing.price);
-        } else {
+      // Calculate cost based on pricing from session
+      if (activeSession.pricing) {
+        const pricing = activeSession.pricing;
+        if (pricing.fixed_price) {
+          // Fixed pricing
+          setSessionCost(parseFloat(pricing.fixed_price));
+        } else if (pricing.price_per_minute) {
+          // Per minute pricing
           const minutesElapsed = Math.floor(diff / (1000 * 60));
-          setSessionCost((minutesElapsed * pricing.price) / 60);
+          setSessionCost(minutesElapsed * parseFloat(pricing.price_per_minute));
         }
       }
     };
@@ -74,7 +74,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
     updateTimer();
     const interval = setInterval(updateTimer, 1000);
     return () => clearInterval(interval);
-  }, [activeSession, gamePricings, table.id]);
+  }, [activeSession]);
 
   const getStatusColor = () => {
     if (activeSession) return "bg-red-500";
@@ -91,6 +91,11 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
     if (activeSession) return "Occupied";
     return table.status?.charAt(0).toUpperCase() + table.status?.slice(1) || "Unknown";
   };
+
+  // Filter game types to only show those available for this table
+  const availableGameTypes = gameTypes.filter(gameType => 
+    tablePricings.some(pricing => pricing.game_type_id === gameType.id)
+  );
 
   const handleStartSession = async () => {
     if (!gameTypeId) {
@@ -111,9 +116,8 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
       return;
     }
 
-    // Find pricing for selected game type
-    const pricing = gamePricings.find(p => 
-      p.table_id === table.id && 
+    // Find pricing for selected game type from table pricings
+    const pricing = tablePricings.find(p => 
       p.game_type_id === parseInt(gameTypeId)
     );
 
@@ -133,7 +137,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
         game_type_id: parseInt(gameTypeId),
         player_id: selectedPlayer1.id,
         player_2_id: selectedPlayer2.id,
-        pricing_id: parseInt(pricing.id),
+        pricing_id: pricing.id,
         club_id: clubId || 1
       };
 
@@ -329,16 +333,16 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
             // Available table display
             <div className="space-y-3">
               <div className="text-sm text-gray-500">
-                Rate: Rs.{table.hourly_rate || 15}/hour
+                Available Game Types: {availableGameTypes.map(gt => gt.name).join(', ')}
               </div>
               
               <Button 
                 onClick={() => setShowStartDialog(true)}
                 className="w-full"
-                disabled={table.status === 'maintenance'}
+                disabled={table.status === 'maintenance' || availableGameTypes.length === 0}
               >
                 <Play className="h-4 w-4 mr-2" />
-                Start Session
+                {availableGameTypes.length === 0 ? 'No Pricing Set' : 'Start Session'}
               </Button>
             </div>
           )}
@@ -361,11 +365,15 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
                   <SelectValue placeholder="Select game type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {gameTypes.map((gameType) => (
-                    <SelectItem key={gameType.id} value={gameType.id.toString()}>
-                      {gameType.name}
-                    </SelectItem>
-                  ))}
+                  {availableGameTypes.map((gameType) => {
+                    const pricing = tablePricings.find(p => p.game_type_id === gameType.id);
+                    return (
+                      <SelectItem key={gameType.id} value={gameType.id.toString()}>
+                        {gameType.name} - Rs.{pricing?.price || 0}
+                        {pricing?.fixed_price ? ' (Fixed)' : ' (Per minute)'}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
