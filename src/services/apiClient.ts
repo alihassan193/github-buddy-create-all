@@ -1,5 +1,5 @@
 // Update API_BASE_URL to your actual API URL - modify this if needed
-const API_BASE_URL = "https://snooker.desert-safaridubai.ae";
+const API_BASE_URL = "http://localhost:5000";
 
 export const apiClient = {
   get: async (path: string) => {

@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ interface TableCardProps {
 }
 
 const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
-  const { gameTypes, clubId } = useData();
+  const { clubId } = useData();
   const { toast } = useToast();
   const [showStartDialog, setShowStartDialog] = useState(false);
   const [showEndDialog, setShowEndDialog] = useState(false);
@@ -27,7 +28,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
   const [showPOSDialog, setShowPOSDialog] = useState(false);
   const [selectedPlayer1, setSelectedPlayer1] = useState<any>(null);
   const [selectedPlayer2, setSelectedPlayer2] = useState<any>(null);
-  const [gameTypeId, setGameTypeId] = useState<string>('');
+  const [selectedPricingId, setSelectedPricingId] = useState<string>('');
   const [notes, setNotes] = useState('');
   const [isStarting, setIsStarting] = useState(false);
   const [isEnding, setIsEnding] = useState(false);
@@ -92,13 +93,19 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
     return table.status?.charAt(0).toUpperCase() + table.status?.slice(1) || "Unknown";
   };
 
-  // Filter game types to only show those available for this table
-  const availableGameTypes = gameTypes.filter(gameType => 
-    tablePricings.some(pricing => pricing.game_type_id === gameType.id)
-  );
+  // Get available game types from table pricings
+  const availableGameTypes = tablePricings.map(pricing => ({
+    ...pricing.game_type,
+    pricing_id: pricing.id,
+    price: pricing.price,
+    fixed_price: pricing.fixed_price,
+    price_per_minute: pricing.price_per_minute,
+    time_limit_minutes: pricing.time_limit_minutes,
+    is_unlimited_time: pricing.is_unlimited_time
+  }));
 
   const handleStartSession = async () => {
-    if (!gameTypeId) {
+    if (!selectedPricingId) {
       toast({
         title: "Error",
         description: "Please select a game type",
@@ -116,15 +123,13 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
       return;
     }
 
-    // Find pricing for selected game type from table pricings
-    const pricing = tablePricings.find(p => 
-      p.game_type_id === parseInt(gameTypeId)
-    );
+    // Find the selected pricing
+    const selectedPricing = tablePricings.find(p => p.id === parseInt(selectedPricingId));
 
-    if (!pricing) {
+    if (!selectedPricing) {
       toast({
         title: "Error",
-        description: "No pricing found for this game type",
+        description: "Selected pricing not found",
         variant: "destructive"
       });
       return;
@@ -134,10 +139,10 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
     try {
       const sessionData = {
         table_id: table.id,
-        game_type_id: parseInt(gameTypeId),
+        game_type_id: selectedPricing.game_type_id,
         player_id: selectedPlayer1.id,
         player_2_id: selectedPlayer2.id,
-        pricing_id: pricing.id,
+        pricing_id: parseInt(selectedPricingId),
         club_id: clubId || 1
       };
 
@@ -151,7 +156,7 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
       // Reset form
       setSelectedPlayer1(null);
       setSelectedPlayer2(null);
-      setGameTypeId('');
+      setSelectedPricingId('');
       setNotes('');
       setShowStartDialog(false);
       
@@ -246,6 +251,11 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
     return `${player1Name} vs ${player2Name}`;
   };
 
+  const getGameTypeName = () => {
+    if (!activeSession || !activeSession.gameType) return '';
+    return activeSession.gameType.name;
+  };
+
   return (
     <>
       <Card className="relative overflow-hidden">
@@ -288,6 +298,13 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
                 <Users className="h-4 w-4 text-blue-600" />
                 <span className="font-medium text-sm">
                   {getPlayerNames()}
+                </span>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <Trophy className="h-4 w-4 text-purple-600" />
+                <span className="font-medium text-sm text-purple-600">
+                  {getGameTypeName()}
                 </span>
               </div>
               
@@ -360,20 +377,19 @@ const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
             
             <div className="space-y-2">
               <Label>Game Type</Label>
-              <Select value={gameTypeId} onValueChange={setGameTypeId}>
+              <Select value={selectedPricingId} onValueChange={setSelectedPricingId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select game type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableGameTypes.map((gameType) => {
-                    const pricing = tablePricings.find(p => p.game_type_id === gameType.id);
-                    return (
-                      <SelectItem key={gameType.id} value={gameType.id.toString()}>
-                        {gameType.name} - Rs.{pricing?.price || 0}
-                        {pricing?.fixed_price ? ' (Fixed)' : ' (Per minute)'}
-                      </SelectItem>
-                    );
-                  })}
+                  {availableGameTypes.map((gameType) => (
+                    <SelectItem key={gameType.pricing_id} value={gameType.pricing_id.toString()}>
+                      {gameType.name} - Rs.{gameType.price}
+                      {gameType.fixed_price ? ' (Fixed)' : ' (Per minute)'}
+                      {gameType.time_limit_minutes && ` - ${gameType.time_limit_minutes} mins`}
+                      {gameType.is_unlimited_time && ' - Unlimited'}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
