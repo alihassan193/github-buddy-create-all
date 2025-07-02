@@ -1,4 +1,3 @@
-
 import { apiClient } from './apiClient';
 
 // Get all tables - matches /api/tables endpoint
@@ -47,9 +46,7 @@ export const getTableById = async (tableId: number): Promise<any> => {
 // Get table pricing - matches /api/tables/:tableId/pricing endpoint
 export const getTablePricing = async (tableId: number, clubId: number): Promise<any[]> => {
   try {
-    const response = await apiClient.get(`/api/tables/${tableId}/pricing`, {
-      club_id: clubId
-    });
+    const response = await apiClient.get(`/api/tables/${tableId}/pricing?club_id=${clubId}`);
     
     if (response.success) {
       return response.data || [];
