@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useData } from "@/context/DataContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,9 +6,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Search, Filter, FileText, DollarSign, Printer } from "lucide-react";
+import { Calendar, Search, Filter, FileText, DollarSign, Printer, Eye } from "lucide-react";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
-import { getAllInvoices } from "@/services/invoiceService";
+import { getAllInvoices, getInvoiceById } from "@/services/invoiceService";
+import { InvoiceDetailDialog } from "@/components/InvoiceDetailDialog";
 import { format } from "date-fns";
 
 const Invoices = () => {
@@ -23,6 +23,9 @@ const Invoices = () => {
   const [dateFilter, setDateFilter] = useState<string>('');
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
+  const [isDetailDialogOpen, setIsDetailDialogOpen] = useState(false);
+  const [isLoadingDetail, setIsLoadingDetail] = useState(false);
   const itemsPerPage = 10;
 
   const fetchInvoices = async (page = 1) => {
@@ -57,6 +60,32 @@ const Invoices = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleViewInvoice = async (invoiceId: number) => {
+    try {
+      setIsLoadingDetail(true);
+      console.log('Fetching invoice details for ID:', invoiceId);
+      
+      const invoiceData = await getInvoiceById(invoiceId);
+      console.log('Invoice detail response:', invoiceData);
+      
+      setSelectedInvoice(invoiceData);
+      setIsDetailDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching invoice details:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch invoice details",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingDetail(false);
+    }
+  };
+
+  const handleInvoiceUpdate = () => {
+    fetchInvoices(currentPage);
   };
 
   useEffect(() => {
@@ -317,6 +346,14 @@ const Invoices = () => {
                       <Button 
                         variant="outline" 
                         size="sm" 
+                        onClick={() => handleViewInvoice(invoice.id)}
+                        disabled={isLoadingDetail}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
                         onClick={() => handlePrintInvoice(invoice)}
                       >
                         <Printer className="h-4 w-4" />
@@ -411,6 +448,17 @@ const Invoices = () => {
           </CardContent>
         </Card>
       )}
+
+      {/* Invoice Detail Dialog */}
+      <InvoiceDetailDialog
+        invoice={selectedInvoice}
+        isOpen={isDetailDialogOpen}
+        onClose={() => {
+          setIsDetailDialogOpen(false);
+          setSelectedInvoice(null);
+        }}
+        onUpdate={handleInvoiceUpdate}
+      />
     </div>
   );
 };

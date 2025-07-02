@@ -72,8 +72,9 @@ export const getInvoiceById = async (id: number): Promise<any> => {
 
 // Update invoice status - matches /api/invoices/:id/status endpoint
 export const updateInvoiceStatus = async (id: number, statusData: {
-  status: 'pending' | 'paid' | 'cancelled';
-  payment_method?: string;
+  payment_status: 'pending' | 'paid' | 'cancelled';
+  payment_method?: 'cash' | 'card' | 'jazzCash' | 'Easypaisa' | 'Others';
+  notes?: string;
 }): Promise<any> => {
   try {
     const response = await apiClient.put(`/api/invoices/${id}/status`, statusData);
