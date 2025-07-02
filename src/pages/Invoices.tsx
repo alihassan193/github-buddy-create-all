@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Calendar, Search, Filter, FileText, DollarSign } from "lucide-react";
+import { Calendar, Search, Filter, FileText, DollarSign, Printer } from "lucide-react";
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination";
 import { getAllInvoices } from "@/services/invoiceService";
 import { format } from "date-fns";
 
@@ -20,20 +21,31 @@ const Invoices = () => {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [gameTypeFilter, setGameTypeFilter] = useState<string>('all');
   const [dateFilter, setDateFilter] = useState<string>('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const itemsPerPage = 10;
 
-  const fetchInvoices = async () => {
+  const fetchInvoices = async (page = 1) => {
     if (!clubId) return;
     
     try {
       setIsLoading(true);
-      console.log('Fetching invoices for club:', clubId);
+      console.log('Fetching invoices for club:', clubId, 'page:', page);
       
       const response = await getAllInvoices({ 
-        status: statusFilter !== 'all' ? statusFilter : undefined 
+        status: statusFilter !== 'all' ? statusFilter : undefined,
+        page: page,
+        limit: itemsPerPage
       });
       console.log('Invoices response:', response);
       
-      setInvoices(response || []);
+      if (Array.isArray(response)) {
+        setInvoices(response);
+        setTotalPages(Math.ceil(response.length / itemsPerPage));
+      } else {
+        setInvoices([]);
+      }
+      setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching invoices:', error);
       toast({
@@ -50,9 +62,83 @@ const Invoices = () => {
   useEffect(() => {
     if (clubId) {
       console.log('Club ID available, fetching invoices:', clubId);
-      fetchInvoices();
+      fetchInvoices(1);
     }
   }, [clubId, statusFilter]);
+
+  const handlePrintInvoice = (invoice: any) => {
+    // Create a printable invoice
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Invoice ${invoice.invoice_number}</title>
+            <style>
+              body { font-family: monospace; font-size: 12px; width: 300px; margin: 0; padding: 20px; }
+              .header { text-align: center; border-bottom: 1px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
+              .row { display: flex; justify-content: space-between; margin: 5px 0; }
+              .total { border-top: 1px solid #000; padding-top: 10px; margin-top: 10px; font-weight: bold; }
+              @media print {
+                body { width: 100%; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <h2>INVOICE</h2>
+              <div>Invoice #: ${invoice.invoice_number || `INV-${invoice.id}`}</div>
+              <div>Date: ${invoice.createdAt ? format(new Date(invoice.createdAt), 'dd/MM/yyyy HH:mm') : ''}</div>
+            </div>
+            
+            <div class="row">
+              <span>Customer:</span>
+              <span>${invoice.customer_name || 'N/A'}</span>
+            </div>
+            
+            <div class="row">
+              <span>Phone:</span>
+              <span>${invoice.customer_phone || 'N/A'}</span>
+            </div>
+            
+            <div style="margin: 15px 0; border-top: 1px solid #000; padding-top: 10px;">
+              <div class="row">
+                <span>Subtotal:</span>
+                <span>Rs.${(invoice.subtotal || 0).toFixed(2)}</span>
+              </div>
+              
+              <div class="row">
+                <span>Tax:</span>
+                <span>Rs.${(invoice.tax_amount || 0).toFixed(2)}</span>
+              </div>
+              
+              <div class="row total">
+                <span>TOTAL:</span>
+                <span>Rs.${(invoice.total_amount || 0).toFixed(2)}</span>
+              </div>
+            </div>
+            
+            <div class="row">
+              <span>Payment:</span>
+              <span>${invoice.payment_method || 'N/A'}</span>
+            </div>
+            
+            <div class="row">
+              <span>Status:</span>
+              <span>${invoice.payment_status || 'N/A'}</span>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px; font-size: 10px;">
+              Thank you for your business!
+            </div>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+  };
 
   const filteredInvoices = invoices.filter(invoice => {
     const matchesSearch = searchQuery === '' || 
@@ -64,6 +150,11 @@ const Invoices = () => {
     
     return matchesSearch && matchesDate;
   });
+
+  // Paginate filtered results
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedInvoices = filteredInvoices.slice(startIndex, startIndex + itemsPerPage);
+  const totalFilteredPages = Math.ceil(filteredInvoices.length / itemsPerPage);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -195,75 +286,119 @@ const Invoices = () => {
       </div>
 
       {/* Invoices List */}
-      {filteredInvoices.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4">
-          {filteredInvoices.map((invoice) => (
-            <Card key={invoice.id} className="hover:shadow-md transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      {invoice.invoice_number || `INV-${invoice.id}`}
-                      <Badge className={getStatusColor(invoice.payment_status)}>
-                        {invoice.payment_status?.charAt(0).toUpperCase() + invoice.payment_status?.slice(1)}
-                      </Badge>
-                    </CardTitle>
-                    <CardDescription>
-                      {invoice.customer_name} • {invoice.payment_method}
-                    </CardDescription>
-                  </div>
-                  <div className="text-right">
-                    <div className="text-lg font-bold text-green-600">
-                      Rs.{formatPrice(invoice.total_amount)}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {invoice.createdAt && format(new Date(invoice.createdAt), 'MMM dd, yyyy')}
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+      {paginatedInvoices.length > 0 ? (
+        <>
+          <div className="grid grid-cols-1 gap-4">
+            {paginatedInvoices.map((invoice) => (
+              <Card key={invoice.id} className="hover:shadow-md transition-shadow">
+                <CardHeader>
+                  <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-medium">
-                        Subtotal: Rs.{formatPrice(invoice.subtotal)}
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        {invoice.invoice_number || `INV-${invoice.id}`}
+                        <Badge className={getStatusColor(invoice.payment_status)}>
+                          {invoice.payment_status?.charAt(0).toUpperCase() + invoice.payment_status?.slice(1)}
+                        </Badge>
+                      </CardTitle>
+                      <CardDescription>
+                        {invoice.customer_name} • {invoice.payment_method}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="text-lg font-bold text-green-600">
+                          Rs.{formatPrice(invoice.total_amount)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {invoice.createdAt && format(new Date(invoice.createdAt), 'MMM dd, yyyy')}
+                        </div>
                       </div>
-                      <div className="text-sm text-muted-foreground">
-                        Tax: Rs.{formatPrice(invoice.tax_amount)}
-                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handlePrintInvoice(invoice)}
+                      >
+                        <Printer className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="font-medium">
-                        {invoice.createdAt && format(new Date(invoice.createdAt), 'HH:mm')}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Time
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium">
+                          Subtotal: Rs.{formatPrice(invoice.subtotal)}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Tax: Rs.{formatPrice(invoice.tax_amount)}
+                        </div>
                       </div>
                     </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="font-medium">
+                          {invoice.createdAt && format(new Date(invoice.createdAt), 'HH:mm')}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Time
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {invoice.customer_phone && (
+                      <div>
+                        <div className="font-medium">
+                          {invoice.customer_phone}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          Phone
+                        </div>
+                      </div>
+                    )}
                   </div>
-                  
-                  {invoice.customer_phone && (
-                    <div>
-                      <div className="font-medium">
-                        {invoice.customer_phone}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        Phone
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          
+          {/* Pagination */}
+          {totalFilteredPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious 
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className={currentPage <= 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+                
+                {Array.from({ length: totalFilteredPages }, (_, i) => i + 1).map((page) => (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+                
+                <PaginationItem>
+                  <PaginationNext 
+                    onClick={() => setCurrentPage(prev => Math.min(totalFilteredPages, prev + 1))}
+                    className={currentPage >= totalFilteredPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       ) : (
         <Card>
           <CardContent className="text-center py-12">
