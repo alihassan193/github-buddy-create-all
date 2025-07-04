@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { useData } from "@/context/DataContext";
 import {
@@ -41,6 +40,7 @@ const AdminTableList = () => {
     table_number: "",
   });
   const [pricings, setPricings] = useState<any[]>([]);
+  const [tablePricings, setTablePricings] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [initialLoadDone, setInitialLoadDone] = useState(false);
 
@@ -76,36 +76,19 @@ const AdminTableList = () => {
     setIsLoading(true);
     
     try {
-      // Get existing pricing from API
+      // Get existing pricing from API using the table-specific endpoint
       const existingPricings = await getTablePricing(table.id, clubId || 1);
-      console.log('Existing pricings:', existingPricings);
+      console.log('Existing table pricings:', existingPricings);
       
-      // Create pricing entries for each game type
-      const initialPricings = gameTypes.map((gameType) => {
-        const existing = existingPricings.find((p: any) => p.game_type_id === gameType.id);
-        
-        if (existing) {
-          return {
-            ...existing,
-            price: parseFloat(existing.price) || 0,
-            fixed_price: existing.fixed_price ? parseFloat(existing.fixed_price) : null,
-            price_per_minute: existing.price_per_minute ? parseFloat(existing.price_per_minute) : null,
-          };
-        } else {
-          // Default pricing based on game type
-          return {
-            table_id: table.id,
-            game_type_id: gameType.id,
-            game_type: gameType,
-            price: gameType.pricing_type === 'fixed' ? 200 : 15,
-            fixed_price: gameType.pricing_type === 'fixed' ? 200 : null,
-            price_per_minute: gameType.pricing_type === 'per_minute' ? 15 : null,
-            time_limit_minutes: gameType.pricing_type === 'fixed' ? 30 : null,
-            is_unlimited_time: gameType.pricing_type === 'per_minute',
-            is_active: false, // New pricing starts as inactive
-          };
-        }
-      });
+      setTablePricings(existingPricings);
+      
+      // Create pricing entries based on existing table pricings
+      const initialPricings = existingPricings.map((pricing: any) => ({
+        ...pricing,
+        price: parseFloat(pricing.price) || 0,
+        fixed_price: pricing.fixed_price ? parseFloat(pricing.fixed_price) : null,
+        price_per_minute: pricing.price_per_minute ? parseFloat(pricing.price_per_minute) : null,
+      }));
 
       setPricings(initialPricings);
       setPricingDialogOpen(true);
@@ -232,9 +215,9 @@ const AdminTableList = () => {
     }
   };
 
-  const updatePricingField = (gameTypeId: number, field: string, value: any) => {
+  const updatePricingField = (pricingId: number, field: string, value: any) => {
     setPricings(pricings.map((p) =>
-      p.game_type_id === gameTypeId ? { ...p, [field]: value } : p
+      p.id === pricingId ? { ...p, [field]: value } : p
     ));
   };
 
@@ -247,83 +230,88 @@ const AdminTableList = () => {
       </div>
 
       {tables.length > 0 ? (
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Number</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Game Types</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tables.map((table) => {
-              // Get pricing for this table from table.pricings array
-              const tablePricings = table.pricings || [];
-              const gameTypesWithPricing = tablePricings.map((tp: any) => tp.game_type).filter(Boolean);
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Number</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="hidden sm:table-cell">Game Types</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {tables.map((table) => {
+                // Get pricing for this table from table.pricings array
+                const tablePricings = table.pricings || [];
+                const gameTypesWithPricing = tablePricings.map((tp: any) => tp.game_type).filter(Boolean);
 
-              return (
-                <TableRow key={table.id}>
-                  <TableCell className="font-medium">
-                    {table.table_number}
-                  </TableCell>
-                  <TableCell>
-                    <span
-                      className={`capitalize ${
-                        table.status === "available"
-                          ? "text-green-600"
-                          : table.status === "occupied"
-                          ? "text-red-600"
-                          : "text-amber-600"
-                      }`}
-                    >
-                      {table.status}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    {gameTypesWithPricing.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {gameTypesWithPricing.map((gt: any, index: number) => (
-                          <span
-                            key={gt?.id || index}
-                            className="inline-block px-2 py-1 text-xs bg-gray-100 rounded-full"
-                          >
-                            {gt?.name || 'Unknown'}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">
-                        No pricing set
+                return (
+                  <TableRow key={table.id}>
+                    <TableCell className="font-medium">
+                      {table.table_number}
+                    </TableCell>
+                    <TableCell>
+                      <span
+                        className={`capitalize ${
+                          table.status === "available"
+                            ? "text-green-600"
+                            : table.status === "occupied"
+                            ? "text-red-600"
+                            : "text-amber-600"
+                        }`}
+                      >
+                        {table.status}
                       </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right space-x-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleOpenPricingDialog(table)}
-                      disabled={isLoading}
-                    >
-                      Pricing
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-red-500 hover:text-red-700"
-                      onClick={() =>
-                        handleDeleteTable(table.id, table.table_number)
-                      }
-                      disabled={isLoading}
-                    >
-                      Delete
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
+                    </TableCell>
+                    <TableCell className="hidden sm:table-cell">
+                      {gameTypesWithPricing.length > 0 ? (
+                        <div className="flex flex-wrap gap-1">
+                          {gameTypesWithPricing.map((gt: any, index: number) => (
+                            <span
+                              key={gt?.id || index}
+                              className="inline-block px-2 py-1 text-xs bg-gray-100 rounded-full"
+                            >
+                              {gt?.name || 'Unknown'}
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 text-sm">
+                          No pricing set
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenPricingDialog(table)}
+                          disabled={isLoading}
+                          className="w-full sm:w-auto"
+                        >
+                          Pricing
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-500 hover:text-red-700 w-full sm:w-auto"
+                          onClick={() =>
+                            handleDeleteTable(table.id, table.table_number)
+                          }
+                          disabled={isLoading}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
       ) : (
         <div className="text-center py-10 border rounded-md">
           <p className="text-muted-foreground">
@@ -343,7 +331,7 @@ const AdminTableList = () => {
 
       {/* Add Table Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[425px] mx-4">
           <DialogHeader>
             <DialogTitle>Add New Table</DialogTitle>
           </DialogHeader>
@@ -362,177 +350,185 @@ const AdminTableList = () => {
               />
             </div>
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => setDialogOpen(false)}
               disabled={isLoading}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button onClick={handleSaveTable} disabled={isLoading}>
+            <Button onClick={handleSaveTable} disabled={isLoading} className="w-full sm:w-auto">
               {isLoading ? "Adding..." : "Add Table"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Pricing Dialog */}
+      {/* Pricing Dialog - Updated to show only table-specific pricing */}
       <Dialog open={pricingDialogOpen} onOpenChange={setPricingDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md mx-4">
           <DialogHeader>
             <DialogTitle>
               Set Pricing for {selectedTable?.table_number || "Table"}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <Tabs defaultValue={gameTypes[0]?.id.toString()}>
-              <TabsList className="mb-4 w-full flex">
-                {gameTypes.map((gameType) => (
-                  <TabsTrigger
-                    key={gameType.id}
-                    value={gameType.id.toString()}
-                    className="flex-1"
-                  >
-                    {gameType.name}
-                  </TabsTrigger>
-                ))}
-              </TabsList>
+            {tablePricings.length > 0 ? (
+              <Tabs defaultValue={tablePricings[0]?.id.toString()}>
+                <TabsList className="mb-4 w-full flex">
+                  {tablePricings.map((pricing) => (
+                    <TabsTrigger
+                      key={pricing.id}
+                      value={pricing.id.toString()}
+                      className="flex-1 text-xs"
+                    >
+                      {pricing.game_type?.name || 'Game'}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
 
-              {gameTypes.map((gameType) => {
-                const pricing = pricings.find((p) => p.game_type_id === gameType.id) || {};
+                {tablePricings.map((tablePricing) => {
+                  const pricing = pricings.find((p) => p.id === tablePricing.id) || tablePricing;
 
-                return (
-                  <TabsContent key={gameType.id} value={gameType.id.toString()}>
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label htmlFor={`enable-${gameType.id}`}>
-                          Enable {gameType.name}
-                        </Label>
-                        <Switch
-                          id={`enable-${gameType.id}`}
-                          checked={pricing.is_active || false}
-                          onCheckedChange={(checked) => {
-                            updatePricingField(gameType.id, "is_active", checked);
-                          }}
-                        />
-                      </div>
+                  return (
+                    <TabsContent key={tablePricing.id} value={tablePricing.id.toString()}>
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <Label htmlFor={`enable-${tablePricing.id}`}>
+                            Enable {tablePricing.game_type?.name}
+                          </Label>
+                          <Switch
+                            id={`enable-${tablePricing.id}`}
+                            checked={pricing.is_active || false}
+                            onCheckedChange={(checked) => {
+                              updatePricingField(tablePricing.id, "is_active", checked);
+                            }}
+                          />
+                        </div>
 
-                      {pricing.is_active && (
-                        <>
-                          {gameType.pricing_type === 'fixed' ? (
-                            // Fixed pricing (Frames)
-                            <>
-                              <div className="grid gap-2">
-                                <Label htmlFor={`fixed-price-${gameType.id}`}>
-                                  Fixed Price (Rs)
-                                </Label>
-                                <Input
-                                  id={`fixed-price-${gameType.id}`}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={pricing.fixed_price || ""}
-                                  onChange={(e) => {
-                                    const value = parseFloat(e.target.value);
-                                    updatePricingField(gameType.id, "fixed_price", value);
-                                    updatePricingField(gameType.id, "price", value);
-                                  }}
-                                />
-                              </div>
-
-                              <div className="grid gap-2">
-                                <Label htmlFor={`time-limit-${gameType.id}`}>
-                                  Time Limit (minutes)
-                                </Label>
-                                <Input
-                                  id={`time-limit-${gameType.id}`}
-                                  type="number"
-                                  min="1"
-                                  value={pricing.time_limit_minutes || ""}
-                                  onChange={(e) =>
-                                    updatePricingField(
-                                      gameType.id,
-                                      "time_limit_minutes",
-                                      parseInt(e.target.value) || null
-                                    )
-                                  }
-                                />
-                              </div>
-                            </>
-                          ) : (
-                            // Per minute pricing (Century)
-                            <>
-                              <div className="grid gap-2">
-                                <Label htmlFor={`per-minute-price-${gameType.id}`}>
-                                  Price per Minute (Rs)
-                                </Label>
-                                <Input
-                                  id={`per-minute-price-${gameType.id}`}
-                                  type="number"
-                                  step="0.01"
-                                  min="0"
-                                  value={pricing.price_per_minute || ""}
-                                  onChange={(e) => {
-                                    const value = parseFloat(e.target.value);
-                                    updatePricingField(gameType.id, "price_per_minute", value);
-                                    updatePricingField(gameType.id, "price", value);
-                                  }}
-                                />
-                              </div>
-
-                              <div className="flex items-center justify-between">
-                                <Label htmlFor={`unlimited-${gameType.id}`}>
-                                  Unlimited Time
-                                </Label>
-                                <Switch
-                                  id={`unlimited-${gameType.id}`}
-                                  checked={pricing.is_unlimited_time || false}
-                                  onCheckedChange={(checked) => {
-                                    updatePricingField(gameType.id, "is_unlimited_time", checked);
-                                  }}
-                                />
-                              </div>
-
-                              {!pricing.is_unlimited_time && (
+                        {pricing.is_active && (
+                          <>
+                            {tablePricing.game_type?.pricing_type === 'fixed' ? (
+                              // Fixed pricing (Frames)
+                              <>
                                 <div className="grid gap-2">
-                                  <Label htmlFor={`time-limit-${gameType.id}`}>
+                                  <Label htmlFor={`fixed-price-${tablePricing.id}`}>
+                                    Fixed Price (Rs)
+                                  </Label>
+                                  <Input
+                                    id={`fixed-price-${tablePricing.id}`}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={pricing.fixed_price || ""}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value);
+                                      updatePricingField(tablePricing.id, "fixed_price", value);
+                                      updatePricingField(tablePricing.id, "price", value);
+                                    }}
+                                  />
+                                </div>
+
+                                <div className="grid gap-2">
+                                  <Label htmlFor={`time-limit-${tablePricing.id}`}>
                                     Time Limit (minutes)
                                   </Label>
                                   <Input
-                                    id={`time-limit-${gameType.id}`}
+                                    id={`time-limit-${tablePricing.id}`}
                                     type="number"
                                     min="1"
                                     value={pricing.time_limit_minutes || ""}
                                     onChange={(e) =>
                                       updatePricingField(
-                                        gameType.id,
+                                        tablePricing.id,
                                         "time_limit_minutes",
                                         parseInt(e.target.value) || null
                                       )
                                     }
                                   />
                                 </div>
-                              )}
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
+                              </>
+                            ) : (
+                              // Per minute pricing (Century)
+                              <>
+                                <div className="grid gap-2">
+                                  <Label htmlFor={`per-minute-price-${tablePricing.id}`}>
+                                    Price per Minute (Rs)
+                                  </Label>
+                                  <Input
+                                    id={`per-minute-price-${tablePricing.id}`}
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={pricing.price_per_minute || ""}
+                                    onChange={(e) => {
+                                      const value = parseFloat(e.target.value);
+                                      updatePricingField(tablePricing.id, "price_per_minute", value);
+                                      updatePricingField(tablePricing.id, "price", value);
+                                    }}
+                                  />
+                                </div>
+
+                                <div className="flex items-center justify-between">
+                                  <Label htmlFor={`unlimited-${tablePricing.id}`}>
+                                    Unlimited Time
+                                  </Label>
+                                  <Switch
+                                    id={`unlimited-${tablePricing.id}`}
+                                    checked={pricing.is_unlimited_time || false}
+                                    onCheckedChange={(checked) => {
+                                      updatePricingField(tablePricing.id, "is_unlimited_time", checked);
+                                    }}
+                                  />
+                                </div>
+
+                                {!pricing.is_unlimited_time && (
+                                  <div className="grid gap-2">
+                                    <Label htmlFor={`time-limit-${tablePricing.id}`}>
+                                      Time Limit (minutes)
+                                    </Label>
+                                    <Input
+                                      id={`time-limit-${tablePricing.id}`}
+                                      type="number"
+                                      min="1"
+                                      value={pricing.time_limit_minutes || ""}
+                                      onChange={(e) =>
+                                        updatePricingField(
+                                          tablePricing.id,
+                                          "time_limit_minutes",
+                                          parseInt(e.target.value) || null
+                                        )
+                                      }
+                                    />
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </TabsContent>
+                  );
+                })}
+              </Tabs>
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No pricing configured for this table</p>
+              </div>
+            )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => setPricingDialogOpen(false)}
               disabled={isLoading}
+              className="w-full sm:w-auto"
             >
               Cancel
             </Button>
-            <Button onClick={handleSavePricing} disabled={isLoading}>
+            <Button onClick={handleSavePricing} disabled={isLoading} className="w-full sm:w-auto">
               {isLoading ? "Saving..." : "Save Pricing"}
             </Button>
           </DialogFooter>
