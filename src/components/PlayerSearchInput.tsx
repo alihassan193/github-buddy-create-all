@@ -40,7 +40,9 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
   const [isCreating, setIsCreating] = useState(false);
   
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
+  const blurTimeoutRef = useRef<NodeJS.Timeout>();
   const inputRef = useRef<HTMLInputElement>(null);
+  const suggestionsRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -77,11 +79,25 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
     };
   }, [searchQuery, user?.club_id, selectedPlayer]);
 
+  // Clean up timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (blurTimeoutRef.current) {
+        clearTimeout(blurTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const getPlayerDisplayName = (player: Player) => {
     return `${player.first_name} ${player.last_name}`.trim();
   };
 
   const handlePlayerSelect = (player: Player) => {
+    // Clear any pending blur timeout
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+    }
+    
     const displayName = getPlayerDisplayName(player);
     setSelectedPlayer(player);
     setSearchQuery(displayName);
@@ -91,6 +107,11 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
   };
 
   const handleCreateNewPlayer = () => {
+    // Clear any pending blur timeout
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+    }
+    
     // Split the search query into first and last name
     const nameParts = searchQuery.trim().split(' ');
     setNewPlayerFirstName(nameParts[0] || '');
@@ -174,8 +195,13 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
   };
 
   const handleInputBlur = () => {
-    // Delay hiding suggestions to allow clicking on them
-    setTimeout(() => setShowSuggestions(false), 200);
+    // Increase delay to allow clicking on suggestions
+    blurTimeoutRef.current = setTimeout(() => setShowSuggestions(false), 300);
+  };
+
+  const handleSuggestionMouseDown = (e: React.MouseEvent) => {
+    // Prevent blur event when clicking on suggestions
+    e.preventDefault();
   };
 
   return (
@@ -197,7 +223,10 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
 
       {/* Suggestions Dropdown */}
       {showSuggestions && !selectedPlayer && (
-        <Card className="absolute top-full left-0 right-0 mt-1 z-50 max-h-60 overflow-y-auto bg-white">
+        <Card 
+          ref={suggestionsRef}
+          className="absolute top-full left-0 right-0 mt-1 z-50 max-h-60 overflow-y-auto bg-white shadow-lg border"
+        >
           <CardContent className="p-0">
             {isSearching ? (
               <div className="p-3 text-center text-gray-500">
@@ -210,6 +239,7 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
                   <div
                     key={player.id}
                     className="p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0 flex items-center gap-2"
+                    onMouseDown={handleSuggestionMouseDown}
                     onClick={() => handlePlayerSelect(player)}
                   >
                     <User className="w-4 h-4 text-gray-400" />
@@ -235,6 +265,7 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
                 ))}
                 <div
                   className="p-3 hover:bg-blue-50 cursor-pointer border-t bg-blue-50/50 flex items-center gap-2 text-blue-600"
+                  onMouseDown={handleSuggestionMouseDown}
                   onClick={handleCreateNewPlayer}
                 >
                   <UserPlus className="w-4 h-4" />
@@ -244,6 +275,7 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
             ) : searchQuery.trim().length >= 2 ? (
               <div
                 className="p-3 hover:bg-blue-50 cursor-pointer flex items-center gap-2 text-blue-600"
+                onMouseDown={handleSuggestionMouseDown}
                 onClick={handleCreateNewPlayer}
               >
                 <UserPlus className="w-4 h-4" />
