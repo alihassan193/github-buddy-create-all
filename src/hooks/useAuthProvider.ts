@@ -38,7 +38,7 @@ export const useAuthProvider = () => {
       try {
         // Try to get current user from backend
         const userData = await getUserProfile();
-        const appUser = mapDatabaseUserToAppUser(userData, userData.Permission || userData.permission);
+        const appUser = mapDatabaseUserToAppUser(userData);
         if (appUser) {
           setUser(appUser);
         }
@@ -50,7 +50,7 @@ export const useAuthProvider = () => {
           if (newToken) {
             // Try again with new token
             const userData = await getUserProfile();
-            const appUser = mapDatabaseUserToAppUser(userData, userData.Permission || userData.permission);
+            const appUser = mapDatabaseUserToAppUser(userData);
             if (appUser) {
               setUser(appUser);
             }
@@ -81,7 +81,7 @@ export const useAuthProvider = () => {
       const response = await loginService(email, password);
       
       // Map the user data to our app format - the response now contains user data correctly
-      const appUser = mapDatabaseUserToAppUser(response.user, response.user.permission || response.user.Permission);
+      const appUser = mapDatabaseUserToAppUser(response.user);
       if (appUser) {
         setUser(appUser);
       }

@@ -138,12 +138,27 @@ export const mapDatabaseUserToAppUser = (userData: any, permissions?: UserPermis
   // Handle permissions from the backend structure
   let mappedPermissions: UserPermissions;
   
+  // Handle different permission structures from different API responses
   if (userData.permissions) {
-    // If permissions come from the API response
+    // If permissions come from the API response (login/me endpoints)
     mappedPermissions = {
       can_manage_tables: userData.permissions.can_manage_tables === 1 || userData.permissions.can_manage_tables === true,
       can_manage_canteen: userData.permissions.can_manage_canteen === 1 || userData.permissions.can_manage_canteen === true,
       can_view_reports: userData.permissions.can_view_reports === 1 || userData.permissions.can_view_reports === true,
+    };
+  } else if (userData.Permission) {
+    // Handle uppercase Permission (from some API responses)
+    mappedPermissions = {
+      can_manage_tables: userData.Permission.can_manage_tables === 1 || userData.Permission.can_manage_tables === true,
+      can_manage_canteen: userData.Permission.can_manage_canteen === 1 || userData.Permission.can_manage_canteen === true,
+      can_view_reports: userData.Permission.can_view_reports === 1 || userData.Permission.can_view_reports === true,
+    };
+  } else if (userData.permission) {
+    // Handle lowercase permission (from some API responses)
+    mappedPermissions = {
+      can_manage_tables: userData.permission.can_manage_tables === 1 || userData.permission.can_manage_tables === true,
+      can_manage_canteen: userData.permission.can_manage_canteen === 1 || userData.permission.can_manage_canteen === true,
+      can_view_reports: userData.permission.can_view_reports === 1 || userData.permission.can_view_reports === true,
     };
   } else if (permissions) {
     // Use provided permissions
@@ -161,6 +176,9 @@ export const mapDatabaseUserToAppUser = (userData: any, permissions?: UserPermis
     };
   }
 
+  // Handle club_id from different possible locations
+  let clubId = userData.club_id || userData.clubId || (userData.club ? userData.club.id : null);
+
   return {
     id: userData.id,
     username: userData.username,
@@ -168,7 +186,7 @@ export const mapDatabaseUserToAppUser = (userData: any, permissions?: UserPermis
     role: userData.role,
     is_active: userData.is_active === 1 || userData.is_active === true,
     sub_admin_id: userData.sub_admin_id,
-    club_id: userData.club_id,
+    club_id: clubId,
     permissions: mappedPermissions
   };
 };
