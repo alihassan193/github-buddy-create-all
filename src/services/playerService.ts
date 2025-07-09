@@ -3,12 +3,14 @@ import { apiClient } from './apiClient';
 
 // Create player - matches /api/players endpoint
 export const createPlayer = async (playerData: {
-  name: string;
+  first_name: string;
+  last_name: string;
   phone?: string;
   email?: string;
   address?: string;
   date_of_birth?: string;
   membership_type?: string;
+  club_id: number;
 }): Promise<any> => {
   try {
     const response = await apiClient.post('/api/players', playerData);

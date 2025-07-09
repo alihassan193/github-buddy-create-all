@@ -33,7 +33,8 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newPlayerName, setNewPlayerName] = useState('');
+  const [newPlayerFirstName, setNewPlayerFirstName] = useState('');
+  const [newPlayerLastName, setNewPlayerLastName] = useState('');
   const [newPlayerPhone, setNewPlayerPhone] = useState('');
   const [newPlayerEmail, setNewPlayerEmail] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -90,7 +91,10 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
   };
 
   const handleCreateNewPlayer = () => {
-    setNewPlayerName(searchQuery);
+    // Split the search query into first and last name
+    const nameParts = searchQuery.trim().split(' ');
+    setNewPlayerFirstName(nameParts[0] || '');
+    setNewPlayerLastName(nameParts.slice(1).join(' ') || '');
     setNewPlayerPhone('');
     setNewPlayerEmail('');
     setShowCreateDialog(true);
@@ -98,10 +102,19 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
   };
 
   const handleCreatePlayer = async () => {
-    if (!newPlayerName.trim()) {
+    if (!newPlayerFirstName.trim()) {
       toast({
         title: "Error",
-        description: "Player name is required",
+        description: "First name is required",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!user?.club_id) {
+      toast({
+        title: "Error",
+        description: "Club ID is required",
         variant: "destructive",
       });
       return;
@@ -110,21 +123,26 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
     setIsCreating(true);
     try {
       const newPlayer = await createPlayer({
-        name: newPlayerName.trim(),
+        first_name: newPlayerFirstName.trim(),
+        last_name: newPlayerLastName.trim() || '',
         phone: newPlayerPhone.trim() || undefined,
         email: newPlayerEmail.trim() || undefined,
+        membership_type: 'regular',
+        club_id: user.club_id,
       });
 
+      const playerDisplayName = `${newPlayerFirstName} ${newPlayerLastName}`.trim();
+      
       toast({
         title: "Success",
-        description: `Player "${newPlayerName}" created successfully`,
+        description: `Player "${playerDisplayName}" created successfully`,
       });
 
       setSelectedPlayer(newPlayer);
-      setSearchQuery(newPlayerName);
+      setSearchQuery(playerDisplayName);
       setShowCreateDialog(false);
       setShowSuggestions(false);
-      onPlayerSelect(newPlayer, newPlayerName);
+      onPlayerSelect(newPlayer, playerDisplayName);
     } catch (error: any) {
       toast({
         title: "Error",
@@ -247,12 +265,21 @@ const PlayerSearchInput = ({ onPlayerSelect, placeholder = "Search by name, phon
           </DialogHeader>
           <div className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="newPlayerName">Name *</Label>
+              <Label htmlFor="newPlayerFirstName">First Name *</Label>
               <Input
-                id="newPlayerName"
-                placeholder="Enter player name"
-                value={newPlayerName}
-                onChange={(e) => setNewPlayerName(e.target.value)}
+                id="newPlayerFirstName"
+                placeholder="Enter first name"
+                value={newPlayerFirstName}
+                onChange={(e) => setNewPlayerFirstName(e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="newPlayerLastName">Last Name</Label>
+              <Input
+                id="newPlayerLastName"
+                placeholder="Enter last name"
+                value={newPlayerLastName}
+                onChange={(e) => setNewPlayerLastName(e.target.value)}
               />
             </div>
             <div className="grid gap-2">
