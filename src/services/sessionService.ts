@@ -107,9 +107,11 @@ export const startTwoPlayerSession = async (sessionData: {
   }
 };
 
-// Announce game result
-export const announceGameResult = async (sessionId: number, winnerPlayer: 'player_1' | 'player_2', loserPlayer: 'player_1' | 'player_2'): Promise<any> => {
+// Announce loser (changed from announce winner)
+export const announceLoser = async (sessionId: number, loserPlayer: 'player_1' | 'player_2'): Promise<any> => {
   try {
+    const winnerPlayer = loserPlayer === 'player_1' ? 'player_2' : 'player_1';
+    
     const response = await apiClient.put(`/api/sessions/${sessionId}/announce-result`, {
       winner_player: winnerPlayer,
       loser_player: loserPlayer
@@ -119,9 +121,9 @@ export const announceGameResult = async (sessionId: number, winnerPlayer: 'playe
       return response.data;
     }
     
-    throw new Error(response.message || 'Failed to announce result');
+    throw new Error(response.message || 'Failed to announce loser');
   } catch (error) {
-    console.error('Error announcing result:', error);
+    console.error('Error announcing loser:', error);
     throw error;
   }
 };
