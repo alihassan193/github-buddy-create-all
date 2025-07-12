@@ -14,21 +14,25 @@ interface Player {
 }
 
 interface PlayerPairSearchInputProps {
-  onPlayersSelect: (player1: Player | null, player2: Player | null) => void;
+  onPlayersSelect: (player1: Player | null, player2: Player | null, name1: string, name2: string) => void;
 }
 
 const PlayerPairSearchInput = ({ onPlayersSelect }: PlayerPairSearchInputProps) => {
   const [player1, setPlayer1] = useState<Player | null>(null);
   const [player2, setPlayer2] = useState<Player | null>(null);
+  const [player1Name, setPlayer1Name] = useState('');
+  const [player2Name, setPlayer2Name] = useState('');
 
   const handlePlayer1Select = (player: Player | null, name: string) => {
     setPlayer1(player);
-    onPlayersSelect(player, player2);
+    setPlayer1Name(name);
+    onPlayersSelect(player, player2, name, player2Name);
   };
 
   const handlePlayer2Select = (player: Player | null, name: string) => {
     setPlayer2(player);
-    onPlayersSelect(player1, player);
+    setPlayer2Name(name);
+    onPlayersSelect(player1, player, player1Name, name);
   };
 
   return (
