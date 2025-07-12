@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, Search, Filter, Download, DollarSign, Clock, CheckCircle, AlertCircle } from "lucide-react";
 import { getAllSessions } from "@/services/sessionService";
-import InvoiceDetailDialog from "@/components/InvoiceDetailDialog";
+import { InvoiceDetailDialog } from "@/components/InvoiceDetailDialog";
 
 const Invoices = () => {
   const { clubId, isLoading } = useData();
@@ -146,7 +146,7 @@ const Invoices = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Invoices & Billing</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foregrund">
             Manage session invoices and track payments
           </p>
         </div>

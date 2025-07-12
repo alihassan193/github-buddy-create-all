@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
+import { useAuth } from "@/context/AuthContext";
 import { startSession, announceGameResult, cancelSession } from "@/services/sessionService";
 import { Play, Trophy, X, Settings, Clock } from "lucide-react";
 import PlayerSearchInput from "./PlayerSearchInput";
@@ -25,7 +26,8 @@ interface EnhancedTableCardProps {
 }
 
 const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) => {
-  const { gameTypes, gamePricings, refreshTables, clubId, user } = useData();
+  const { gameTypes, gamePricings, refreshTables, clubId } = useData();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [gameTypeId, setGameTypeId] = useState<number | null>(null);
@@ -39,6 +41,8 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const [isCancelling, setIsCancelling] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [canCancel, setCanCancel] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [posOpen, setPosOpen] = useState(false);
   
   // Filter pricing for this table
   const tablePricings = gamePricings.filter(p => p.table_id === table.id);
@@ -71,11 +75,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     setPlayerName(name);
   };
 
-  const handlePlayerPairSelect = (player1: any, player2: any, name1: string, name2: string) => {
+  const handlePlayersSelect = (player1: any, player2: any) => {
     setSelectedPlayer(player1);
     setSelectedPlayer2(player2);
-    setPlayerName(name1);
-    setPlayer2Name(name2);
+    setPlayerName(player1?.first_name && player1?.last_name ? `${player1.first_name} ${player1.last_name}` : '');
+    setPlayer2Name(player2?.first_name && player2?.last_name ? `${player2.first_name} ${player2.last_name}` : '');
   };
   
   const handleStartSession = async () => {
@@ -244,7 +248,13 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
             <CardTitle className="flex items-center gap-2">
               {table.table_number}
               {canManageTables && (
-                <TableSettingsDialog table={table} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Settings className="h-4 w-4" />
+                </Button>
               )}
             </CardTitle>
             <CardDescription>
@@ -294,11 +304,16 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         
         {activeSession && (
           <div className="mt-4 space-y-2">
-            {activeSession.canteen_amount > 0 && (
-              <CanteenOrderDialog sessionId={activeSession.id} />
-            )}
+            <CanteenOrderDialog session={activeSession} />
             
-            <SessionPOSDialog sessionId={activeSession.id} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPosOpen(true)}
+              className="w-full"
+            >
+              Point of Sale
+            </Button>
             
             <div className="flex gap-2">
               {canCancel ? (
@@ -379,7 +394,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
                 {sessionType === 'single' ? (
                   <PlayerSearchInput onPlayerSelect={handlePlayerSelect} />
                 ) : (
-                  <PlayerPairSearchInput onPlayerPairSelect={handlePlayerPairSelect} />
+                  <PlayerPairSearchInput onPlayersSelect={handlePlayersSelect} />
                 )}
                 
                 <div className="grid grid-cols-1 gap-2">
@@ -410,6 +425,27 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
           </Dialog>
         )}
       </CardFooter>
+
+      {/* Dialogs */}
+      {canManageTables && (
+        <TableSettingsDialog 
+          table={table} 
+          open={settingsOpen} 
+          onOpenChange={setSettingsOpen}
+        />
+      )}
+      
+      {activeSession && (
+        <SessionPOSDialog
+          open={posOpen}
+          onOpenChange={setPosOpen}
+          sessionId={activeSession.id}
+          sessionInfo={{
+            table_number: table.table_number,
+            player_names: `${activeSession.player_1_name} vs ${activeSession.player_2_name}`
+          }}
+        />
+      )}
     </Card>
   );
 };
