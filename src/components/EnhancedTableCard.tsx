@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { startSession, announceGameResult, cancelSession } from "@/services/sessionService";
-import { Play, Trophy, X, Settings, Clock } from "lucide-react";
+import { Play, Trophy, X, Settings, Clock, DollarSign } from "lucide-react";
 import PlayerPairSearchInput from "./PlayerPairSearchInput";
 import TableSettingsDialog from "./TableSettingsDialog";
 import SessionPOSDialog from "./SessionPOSDialog";
@@ -39,6 +39,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const [isCancelling, setIsCancelling] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [canCancel, setCanCancel] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [posOpen, setPosOpen] = useState(false);
   const [canteenOrderOpen, setCanteenOrderOpen] = useState(false);
@@ -48,6 +49,15 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   
   // Find active session for this table
   const activeSession = activeSessions.find(session => session.table_id === table.id);
+  
+  // Update current time every second for real-time display
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    
+    return () => clearInterval(interval);
+  }, []);
   
   // Check if session can be cancelled (within 1 minute of start)
   useEffect(() => {
@@ -69,11 +79,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     }
   }, [activeSession]);
 
-  const handlePlayersSelect = (player1: any, player2: any) => {
+  const handlePlayersSelect = (player1: any, player2: any, name1: string, name2: string) => {
     setSelectedPlayer1(player1);
     setSelectedPlayer2(player2);
-    setPlayer1Name(player1?.first_name && player1?.last_name ? `${player1.first_name} ${player1.last_name}` : '');
-    setPlayer2Name(player2?.first_name && player2?.last_name ? `${player2.first_name} ${player2.last_name}` : '');
+    setPlayer1Name(name1);
+    setPlayer2Name(name2);
   };
   
   const handleStartSession = async () => {
@@ -122,7 +132,6 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         game_type_id: gameTypeId,
         pricing_id: selectedPricing.id,
         club_id: clubId || 1,
-        estimated_duration: 120,
         ...(selectedPlayer1 && { player_id: selectedPlayer1.id }),
         ...((!selectedPlayer1 && player1Name.trim()) && { guest_player_name: player1Name.trim() }),
         ...(selectedPlayer2 && { player_2_id: selectedPlayer2.id }),
@@ -228,6 +237,23 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     return formatDistanceToNow(new Date(activeSession.start_time), { addSuffix: false });
   };
 
+  const calculateCurrentPrice = () => {
+    if (!activeSession?.start_time) return 0;
+    
+    const pricing = gamePricings.find(p => p.id === activeSession.pricing_id);
+    if (!pricing) return 0;
+    
+    if (pricing.is_unlimited) {
+      return pricing.price;
+    }
+    
+    const startTime = new Date(activeSession.start_time);
+    const elapsedMinutes = Math.floor((currentTime.getTime() - startTime.getTime()) / (1000 * 60));
+    const timeBlocks = Math.ceil(elapsedMinutes / pricing.time_limit_minutes);
+    
+    return timeBlocks * pricing.price;
+  };
+
   const canManageTables = user?.permissions?.can_manage_tables || user?.role === 'super_admin';
   
   return (
@@ -255,6 +281,10 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
                     <Clock className="h-3 w-3" />
                     {getSessionDuration()}
                   </div>
+                  <div className="text-xs flex items-center gap-1">
+                    <DollarSign className="h-3 w-3" />
+                    ${calculateCurrentPrice()}
+                  </div>
                 </div>
               ) : (
                 tablePricings.length > 0 
@@ -270,7 +300,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       </CardHeader>
       
       <CardContent className="py-4">
-        {/* Session History Button - 80% width at top */}
+        {/* Session History Button */}
         <div className="flex justify-center mb-4">
           <TableSessionHistoryDialog 
             tableId={table.id} 
@@ -278,16 +308,32 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
           />
         </div>
         
-        <div className="flex items-center justify-center h-32 felt-bg rounded-md">
-          <div className="grid grid-cols-3 w-full h-full">
-            <div className="flex items-center justify-center">
-              <div className="w-6 h-6 bg-red-500 rounded-full"></div>
+        {/* Snooker Table Visual */}
+        <div 
+          className="flex items-center justify-center h-32 rounded-md relative overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, #0f4c3a 0%, #1a5c4a 100%)'
+          }}
+        >
+          {/* Table rails */}
+          <div className="absolute inset-2 border-4 border-amber-600 rounded-sm">
+            {/* Pockets */}
+            <div className="absolute -top-2 -left-2 w-4 h-4 bg-black rounded-full"></div>
+            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-black rounded-full"></div>
+            <div className="absolute -top-2 -right-2 w-4 h-4 bg-black rounded-full"></div>
+            <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-black rounded-full"></div>
+            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-black rounded-full"></div>
+            <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-black rounded-full"></div>
+            
+            {/* Balls */}
+            <div className="absolute top-1/2 left-8 transform -translate-y-1/2">
+              <div className="w-3 h-3 bg-white rounded-full border border-gray-400"></div>
             </div>
-            <div className="flex items-center justify-center">
-              <div className="w-6 h-6 bg-white rounded-full border-2 border-gray-300"></div>
+            <div className="absolute top-1/2 right-8 transform -translate-y-1/2">
+              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
             </div>
-            <div className="flex items-center justify-center">
-              <div className="w-6 h-6 bg-black rounded-full"></div>
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+              <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
             </div>
           </div>
         </div>
