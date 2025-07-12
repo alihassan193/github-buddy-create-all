@@ -68,6 +68,22 @@ export const getCompletedSessions = async (clubId?: number): Promise<any[]> => {
   }
 };
 
+// Get table sessions - new function for the session history by table
+export const getTableSessions = async (clubId: number, tableId: number): Promise<any> => {
+  try {
+    const response = await apiClient.get(`/api/tables/session?club_id=${clubId}&table_id=${tableId}`);
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to fetch table sessions');
+  } catch (error) {
+    console.error('Error fetching table sessions:', error);
+    throw error;
+  }
+};
+
 // Get session by ID
 export const getSessionById = async (sessionId: number): Promise<any> => {
   try {
@@ -107,8 +123,8 @@ export const startTwoPlayerSession = async (sessionData: {
   }
 };
 
-// Announce loser (changed from announce winner)
-export const announceLoser = async (sessionId: number, loserPlayer: 'player_1' | 'player_2'): Promise<any> => {
+// Announce game result (restored original function)
+export const announceGameResult = async (sessionId: number, loserPlayer: 'player_1' | 'player_2'): Promise<any> => {
   try {
     const winnerPlayer = loserPlayer === 'player_1' ? 'player_2' : 'player_1';
     
@@ -121,9 +137,25 @@ export const announceLoser = async (sessionId: number, loserPlayer: 'player_1' |
       return response.data;
     }
     
-    throw new Error(response.message || 'Failed to announce loser');
+    throw new Error(response.message || 'Failed to announce result');
   } catch (error) {
-    console.error('Error announcing loser:', error);
+    console.error('Error announcing result:', error);
+    throw error;
+  }
+};
+
+// Cancel session - new function
+export const cancelSession = async (sessionId: number): Promise<any> => {
+  try {
+    const response = await apiClient.put(`/api/sessions/${sessionId}/cancel`, {});
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to cancel session');
+  } catch (error) {
+    console.error('Error cancelling session:', error);
     throw error;
   }
 };

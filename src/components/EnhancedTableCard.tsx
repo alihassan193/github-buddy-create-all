@@ -1,502 +1,416 @@
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useState, useEffect, useCallback } from "react";
+import { SnookerTable } from "@/types";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Clock, Play, CircleStop, DollarSign, User, ShoppingCart, Trophy, Users } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
-import { startTwoPlayerSession, endSession, announceGameResult } from "@/services/sessionService";
+import { startSession, announceGameResult, cancelSession } from "@/services/sessionService";
+import { Play, Trophy, X, Settings, Clock } from "lucide-react";
+import PlayerSearchInput from "./PlayerSearchInput";
 import PlayerPairSearchInput from "./PlayerPairSearchInput";
+import TableSettingsDialog from "./TableSettingsDialog";
 import SessionPOSDialog from "./SessionPOSDialog";
+import CanteenOrderDialog from "./CanteenOrderDialog";
+import { formatDistanceToNow } from "date-fns";
+import TableSessionHistoryDialog from "./TableSessionHistoryDialog";
 
-interface TableCardProps {
-  table: any;
-  activeSessions?: any[];
+interface EnhancedTableCardProps {
+  table: SnookerTable;
+  activeSessions: any[];
 }
 
-const EnhancedTableCard = ({ table, activeSessions = [] }: TableCardProps) => {
-  const { clubId } = useData();
+const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) => {
+  const { gameTypes, gamePricings, refreshTables, clubId, user } = useData();
   const { toast } = useToast();
-  const [showStartDialog, setShowStartDialog] = useState(false);
-  const [showEndDialog, setShowEndDialog] = useState(false);
-  const [showResultDialog, setShowResultDialog] = useState(false);
-  const [showPOSDialog, setShowPOSDialog] = useState(false);
-  const [selectedPlayer1, setSelectedPlayer1] = useState<any>(null);
+  const [open, setOpen] = useState(false);
+  const [gameTypeId, setGameTypeId] = useState<number | null>(null);
+  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
   const [selectedPlayer2, setSelectedPlayer2] = useState<any>(null);
-  const [selectedPricingId, setSelectedPricingId] = useState<string>('');
-  const [notes, setNotes] = useState('');
+  const [playerName, setPlayerName] = useState('');
+  const [player2Name, setPlayer2Name] = useState('');
   const [isStarting, setIsStarting] = useState(false);
-  const [isEnding, setIsEnding] = useState(false);
+  const [sessionType, setSessionType] = useState<'single' | 'double'>('single');
   const [isAnnouncingResult, setIsAnnouncingResult] = useState(false);
-  const [sessionTimer, setSessionTimer] = useState<string>('00:00:00');
-  const [sessionCost, setSessionCost] = useState<number>(0);
-  const [winner, setWinner] = useState<'player_1' | 'player_2' | ''>('');
-
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
+  const [canCancel, setCanCancel] = useState(false);
+  
+  // Filter pricing for this table
+  const tablePricings = gamePricings.filter(p => p.table_id === table.id);
+  
   // Find active session for this table
   const activeSession = activeSessions.find(session => session.table_id === table.id);
-
-  // Get table pricings from the table object
-  const tablePricings = table.pricings || [];
-
-  // Update timer and cost for active sessions
+  
+  // Check if session can be cancelled (within 1 minute of start)
   useEffect(() => {
-    if (!activeSession) return;
-
-    const updateTimer = () => {
-      const startTime = new Date(activeSession.start_time).getTime();
-      const now = Date.now();
-      const diff = now - startTime;
+    if (activeSession?.start_time) {
+      const startTime = new Date(activeSession.start_time);
+      setSessionStartTime(startTime);
       
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+      const checkCancelTimeout = () => {
+        const now = new Date();
+        const timeDiff = now.getTime() - startTime.getTime();
+        const canCancelSession = timeDiff < 60000; // 1 minute in milliseconds
+        setCanCancel(canCancelSession);
+      };
       
-      setSessionTimer(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+      checkCancelTimeout();
+      const interval = setInterval(checkCancelTimeout, 1000);
       
-      // Calculate cost based on pricing from session
-      if (activeSession.pricing) {
-        const pricing = activeSession.pricing;
-        if (pricing.fixed_price) {
-          // Fixed pricing
-          setSessionCost(parseFloat(pricing.fixed_price));
-        } else if (pricing.price_per_minute) {
-          // Per minute pricing
-          const minutesElapsed = Math.floor(diff / (1000 * 60));
-          setSessionCost(minutesElapsed * parseFloat(pricing.price_per_minute));
-        }
-      }
-    };
-
-    updateTimer();
-    const interval = setInterval(updateTimer, 1000);
-    return () => clearInterval(interval);
-  }, [activeSession]);
-
-  const getStatusColor = () => {
-    if (activeSession) return "bg-red-500";
-    switch (table.status) {
-      case 'available': return "bg-green-500";
-      case 'occupied': return "bg-red-500";
-      case 'maintenance': return "bg-yellow-500";
-      case 'reserved': return "bg-blue-500";
-      default: return "bg-gray-500";
+      return () => clearInterval(interval);
     }
+  }, [activeSession]);
+  
+  const handlePlayerSelect = (player: any, name: string) => {
+    setSelectedPlayer(player);
+    setPlayerName(name);
   };
 
-  const getStatusText = () => {
-    if (activeSession) return "Occupied";
-    return table.status?.charAt(0).toUpperCase() + table.status?.slice(1) || "Unknown";
+  const handlePlayerPairSelect = (player1: any, player2: any, name1: string, name2: string) => {
+    setSelectedPlayer(player1);
+    setSelectedPlayer2(player2);
+    setPlayerName(name1);
+    setPlayer2Name(name2);
   };
-
-  // Get available game types from table pricings
-  const availableGameTypes = tablePricings.map(pricing => ({
-    ...pricing.game_type,
-    pricing_id: pricing.id,
-    price: pricing.price,
-    fixed_price: pricing.fixed_price,
-    price_per_minute: pricing.price_per_minute,
-    time_limit_minutes: pricing.time_limit_minutes,
-    is_unlimited_time: pricing.is_unlimited_time
-  }));
-
+  
   const handleStartSession = async () => {
-    if (!selectedPricingId) {
+    if (!gameTypeId) {
       toast({
         title: "Error",
         description: "Please select a game type",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
-
-    if (!selectedPlayer1 || !selectedPlayer2) {
+    
+    if (!playerName.trim()) {
       toast({
         title: "Error",
-        description: "Please select both players",
-        variant: "destructive"
+        description: "Please enter or select a player",
+        variant: "destructive",
       });
       return;
     }
 
-    // Find the selected pricing
-    const selectedPricing = tablePricings.find(p => p.id === parseInt(selectedPricingId));
+    if (sessionType === 'double' && !player2Name.trim()) {
+      toast({
+        title: "Error",
+        description: "Please enter or select second player",
+        variant: "destructive",
+      });
+      return;
+    }
 
+    const selectedPricing = tablePricings.find(p => p.game_type_id === gameTypeId);
     if (!selectedPricing) {
       toast({
         title: "Error",
-        description: "Selected pricing not found",
-        variant: "destructive"
+        description: "No pricing found for selected game type",
+        variant: "destructive",
       });
       return;
     }
-
+    
     setIsStarting(true);
+    
     try {
       const sessionData = {
         table_id: table.id,
-        game_type_id: selectedPricing.game_type_id,
-        player_id: selectedPlayer1.id,
-        player_2_id: selectedPlayer2.id,
-        pricing_id: parseInt(selectedPricingId),
-        club_id: clubId || 1
+        game_type_id: gameTypeId,
+        pricing_id: selectedPricing.id,
+        club_id: clubId || 1,
+        estimated_duration: 120,
+        is_guest: !selectedPlayer,
+        ...(selectedPlayer && { player_id: selectedPlayer.id }),
+        ...((!selectedPlayer && playerName.trim()) && { guest_player_name: playerName.trim() }),
+        ...(sessionType === 'double' && {
+          player_2_id: selectedPlayer2?.id,
+          is_guest_2: !selectedPlayer2,
+          ...((!selectedPlayer2 && player2Name.trim()) && { guest_player_2_name: player2Name.trim() })
+        })
       };
 
-      await startTwoPlayerSession(sessionData);
+      await startSession(sessionData);
       
       toast({
         title: "Session Started",
-        description: `Session started for ${selectedPlayer1.first_name} ${selectedPlayer1.last_name} vs ${selectedPlayer2.first_name} ${selectedPlayer2.last_name}`,
+        description: `Session started on ${table.table_number}`,
       });
-
-      // Reset form
-      setSelectedPlayer1(null);
-      setSelectedPlayer2(null);
-      setSelectedPricingId('');
-      setNotes('');
-      setShowStartDialog(false);
       
-      // Refresh page to show updated status
-      window.location.reload();
+      setOpen(false);
+      setPlayerName('');
+      setPlayer2Name('');
+      setSelectedPlayer(null);
+      setSelectedPlayer2(null);
+      setGameTypeId(null);
+      
+      refreshTables();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to start session",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsStarting(false);
     }
   };
 
-  const handleAnnounceResult = async () => {
-    if (!winner) {
+  const handleCancelSession = async () => {
+    if (!activeSession) return;
+    
+    setIsCancelling(true);
+    try {
+      await cancelSession(activeSession.id);
+      
+      toast({
+        title: "Session Cancelled",
+        description: "The session has been cancelled successfully",
+      });
+      
+      refreshTables();
+    } catch (error: any) {
       toast({
         title: "Error",
-        description: "Please select a winner",
-        variant: "destructive"
+        description: error.message || "Failed to cancel session",
+        variant: "destructive",
       });
-      return;
+    } finally {
+      setIsCancelling(false);
     }
+  };
 
+  const handleAnnounceResult = async (loserPlayer: 'player_1' | 'player_2') => {
+    if (!activeSession) return;
+    
     setIsAnnouncingResult(true);
     try {
-      const loser = winner === 'player_1' ? 'player_2' : 'player_1';
-      await announceGameResult(activeSession.id, winner, loser);
-
+      await announceGameResult(activeSession.id, loserPlayer);
+      
       toast({
         title: "Result Announced",
-        description: `Winner: ${winner === 'player_1' ? 'Player 1' : 'Player 2'}`,
+        description: "Game result has been announced successfully",
       });
-
-      setShowResultDialog(false);
-      setWinner('');
       
-      // Show end session dialog after announcing result
-      setTimeout(() => setShowEndDialog(true), 500);
+      refreshTables();
     } catch (error: any) {
       toast({
         title: "Error",
         description: error.message || "Failed to announce result",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsAnnouncingResult(false);
     }
   };
-
-  const handleEndSession = async () => {
-    if (!activeSession) return;
-
-    setIsEnding(true);
-    try {
-      await endSession(activeSession.id, notes.trim() || undefined);
-
-      toast({
-        title: "Session Ended",
-        description: `Session ended. Total amount: Rs.${sessionCost.toFixed(2)}`,
-      });
-
-      setShowEndDialog(false);
-      setNotes('');
-      
-      // Refresh page to show updated status
-      window.location.reload();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message || "Failed to end session",
-        variant: "destructive"
-      });
-    } finally {
-      setIsEnding(false);
+  
+  const statusColors = {
+    available: "bg-green-500",
+    occupied: "bg-red-500",
+    maintenance: "bg-yellow-500",
+    reserved: "bg-blue-500"
+  };
+  
+  const getGameTypeLabel = (gameTypeId: number) => {
+    const gameType = gameTypes.find(gt => gt.id === gameTypeId);
+    const pricing = tablePricings.find(p => p.game_type_id === gameTypeId);
+    
+    if (!gameType || !pricing) return '';
+    
+    if (pricing.is_unlimited) {
+      return `${gameType.name} ($${pricing.price})`;
+    } else {
+      return `${gameType.name} ($${pricing.price}/${pricing.time_limit_minutes} min)`;
     }
   };
 
-  const handlePlayersSelect = (player1: any, player2: any) => {
-    setSelectedPlayer1(player1);
-    setSelectedPlayer2(player2);
+  const getSessionDuration = () => {
+    if (!activeSession?.start_time) return '';
+    return formatDistanceToNow(new Date(activeSession.start_time), { addSuffix: false });
   };
 
-  const getPlayerNames = () => {
-    if (!activeSession) return '';
-    
-    const player1Name = activeSession.player ? `${activeSession.player.first_name} ${activeSession.player.last_name}` : 'Player 1';
-    const player2Name = activeSession.player2 ? `${activeSession.player2.first_name} ${activeSession.player2.last_name}` : 'Player 2';
-    
-    return `${player1Name} vs ${player2Name}`;
-  };
-
-  const getGameTypeName = () => {
-    if (!activeSession || !activeSession.gameType) return '';
-    return activeSession.gameType.name;
-  };
-
+  const canManageTables = user?.permissions?.can_manage_tables || user?.role === 'super_admin';
+  
   return (
-    <>
-      <Card className="relative overflow-hidden">
-        <div className={`absolute top-0 right-0 w-3 h-full ${getStatusColor()}`} />
+    <Card className="overflow-hidden border-2 hover:shadow-lg transition-shadow">
+      <CardHeader className={`py-4 ${table.status === 'occupied' ? 'bg-red-50' : table.status === 'maintenance' ? 'bg-yellow-50' : table.status === 'reserved' ? 'bg-blue-50' : 'bg-green-50'}`}>
+        <div className="flex justify-between items-start">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              {table.table_number}
+              {canManageTables && (
+                <TableSettingsDialog table={table} />
+              )}
+            </CardTitle>
+            <CardDescription>
+              {activeSession ? (
+                <div className="space-y-1">
+                  <div>{activeSession.player_1_name} vs {activeSession.player_2_name}</div>
+                  <div className="text-xs flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {getSessionDuration()}
+                  </div>
+                </div>
+              ) : (
+                tablePricings.length > 0 
+                  ? `${tablePricings.length} game types available`
+                  : 'No pricing set'
+              )}
+            </CardDescription>
+          </div>
+          <Badge className={statusColors[table.status]}>
+            {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
+          </Badge>
+        </div>
+      </CardHeader>
+      
+      <CardContent className="py-4">
+        {/* Session History Button - 80% width at top */}
+        <div className="flex justify-center mb-4">
+          <TableSessionHistoryDialog 
+            tableId={table.id} 
+            tableNumber={table.table_number} 
+          />
+        </div>
         
-        <CardHeader className="pb-3">
-          <div className="flex justify-between items-start">
-            <div>
-              <CardTitle className="text-xl">Table {table.table_number}</CardTitle>
-              <Badge variant="outline" className="mt-1">
-                {table.table_type || 'Standard'}
-              </Badge>
+        <div className="flex items-center justify-center h-32 felt-bg rounded-md">
+          <div className="grid grid-cols-3 w-full h-full">
+            <div className="flex items-center justify-center">
+              <div className="w-6 h-6 bg-red-500 rounded-full"></div>
             </div>
-            <Badge className={getStatusColor().replace('bg-', 'bg-opacity-20 text-')}>
-              {getStatusText()}
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {/* Snooker table background with better styling */}
-          <div 
-            className="relative h-32 rounded-lg bg-cover bg-center bg-no-repeat shadow-inner"
-            style={{ 
-              backgroundImage: `url('/lovable-uploads/a40fb048-a62d-4857-ba5b-d25bdb9d95cd.png')`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            }}
-          >
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent rounded-lg"></div>
-            <div className="absolute bottom-2 left-2 text-white font-semibold text-sm drop-shadow-lg">
-              Table {table.table_number}
+            <div className="flex items-center justify-center">
+              <div className="w-6 h-6 bg-white rounded-full border-2 border-gray-300"></div>
+            </div>
+            <div className="flex items-center justify-center">
+              <div className="w-6 h-6 bg-black rounded-full"></div>
             </div>
           </div>
-
-          {activeSession ? (
-            // Active session display
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-blue-600" />
-                <span className="font-medium text-sm">
-                  {getPlayerNames()}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Trophy className="h-4 w-4 text-purple-600" />
-                <span className="font-medium text-sm text-purple-600">
-                  {getGameTypeName()}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Clock className="h-4 w-4 text-green-600" />
-                <span className="font-mono text-lg font-bold">{sessionTimer}</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <DollarSign className="h-4 w-4 text-green-600" />
-                <span className="font-medium">Rs.{sessionCost.toFixed(2)}</span>
-              </div>
-              
-              <div className="flex gap-2">
+        </div>
+        
+        {activeSession && (
+          <div className="mt-4 space-y-2">
+            {activeSession.canteen_amount > 0 && (
+              <CanteenOrderDialog sessionId={activeSession.id} />
+            )}
+            
+            <SessionPOSDialog sessionId={activeSession.id} />
+            
+            <div className="flex gap-2">
+              {canCancel ? (
                 <Button 
-                  onClick={() => setShowResultDialog(true)}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
-                  disabled={activeSession.game_result_announced}
+                  onClick={handleCancelSession}
+                  disabled={isCancelling}
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1"
                 >
-                  <Trophy className="h-4 w-4 mr-2" />
-                  {activeSession.game_result_announced ? 'Result Announced' : 'Announce Winner'}
+                  <X className="h-4 w-4 mr-1" />
+                  {isCancelling ? 'Cancelling...' : 'Cancel Session'}
                 </Button>
-                <Button 
-                  variant="outline" 
-                  size="icon"
-                  onClick={() => setShowPOSDialog(true)}
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {activeSession.game_result_announced && (
-                <Button 
-                  onClick={() => setShowEndDialog(true)}
-                  className="w-full bg-red-600 hover:bg-red-700"
-                >
-                  <CircleStop className="h-4 w-4 mr-2" />
-                  End Session
-                </Button>
+              ) : (
+                <>
+                  <Button 
+                    onClick={() => handleAnnounceResult('player_1')}
+                    disabled={isAnnouncingResult}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    <Trophy className="h-4 w-4 mr-1" />
+                    {activeSession.player_1_name} Lost
+                  </Button>
+                  <Button 
+                    onClick={() => handleAnnounceResult('player_2')}
+                    disabled={isAnnouncingResult}
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                  >
+                    <Trophy className="h-4 w-4 mr-1" />
+                    {activeSession.player_2_name} Lost
+                  </Button>
+                </>
               )}
             </div>
-          ) : (
-            // Available table display
-            <div className="space-y-3">
-              <div className="text-sm text-gray-500">
-                Available Game Types: {availableGameTypes.map(gt => gt.name).join(', ')}
-              </div>
-              
+          </div>
+        )}
+      </CardContent>
+      
+      <CardFooter className="flex justify-center py-4">
+        {table.status === 'available' && (
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
               <Button 
-                onClick={() => setShowStartDialog(true)}
+                disabled={tablePricings.length === 0}
                 className="w-full"
-                disabled={table.status === 'maintenance' || availableGameTypes.length === 0}
               >
                 <Play className="h-4 w-4 mr-2" />
-                {availableGameTypes.length === 0 ? 'No Pricing Set' : 'Start Session'}
+                {tablePricings.length === 0 ? "No Game Types Available" : "Start Session"}
               </Button>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Start Session Dialog */}
-      <Dialog open={showStartDialog} onOpenChange={setShowStartDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Start Session - Table {table.table_number}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <PlayerPairSearchInput onPlayersSelect={handlePlayersSelect} />
-            
-            <div className="space-y-2">
-              <Label>Game Type</Label>
-              <Select value={selectedPricingId} onValueChange={setSelectedPricingId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select game type" />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableGameTypes.map((gameType) => (
-                    <SelectItem key={gameType.pricing_id} value={gameType.pricing_id.toString()}>
-                      {gameType.name} - Rs.{gameType.price}
-                      {gameType.fixed_price ? ' (Fixed)' : ' (Per minute)'}
-                      {gameType.time_limit_minutes && ` - ${gameType.time_limit_minutes} mins`}
-                      {gameType.is_unlimited_time && ' - Unlimited'}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowStartDialog(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button onClick={handleStartSession} disabled={isStarting} className="flex-1">
-                {isStarting ? 'Starting...' : 'Start Session'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Announce Result Dialog */}
-      <Dialog open={showResultDialog} onOpenChange={setShowResultDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Announce Winner - Table {table.table_number}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Select Winner</Label>
-              <Select value={winner} onValueChange={(value: 'player_1' | 'player_2') => setWinner(value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Choose the winner" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="player_1">
-                    Player 1: {activeSession?.player ? `${activeSession.player.first_name} ${activeSession.player.last_name}` : 'Player 1'}
-                  </SelectItem>
-                  <SelectItem value="player_2">
-                    Player 2: {activeSession?.player2 ? `${activeSession.player2.first_name} ${activeSession.player2.last_name}` : 'Player 2'}
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowResultDialog(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleAnnounceResult} 
-                disabled={isAnnouncingResult} 
-                className="flex-1 bg-blue-600 hover:bg-blue-700"
-              >
-                {isAnnouncingResult ? 'Announcing...' : 'Announce Winner'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* End Session Dialog */}
-      <Dialog open={showEndDialog} onOpenChange={setShowEndDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>End Session - Table {table.table_number}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600">Session Duration</div>
-              <div className="text-2xl font-bold">{sessionTimer}</div>
-              <div className="text-sm text-gray-600 mt-2">Total Amount</div>
-              <div className="text-xl font-bold text-green-600">Rs.{sessionCost.toFixed(2)}</div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Notes (Optional)</Label>
-              <Textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Add any notes..."
-                rows={3}
-              />
-            </div>
-
-            <div className="flex gap-2 pt-4">
-              <Button variant="outline" onClick={() => setShowEndDialog(false)} className="flex-1">
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleEndSession} 
-                disabled={isEnding} 
-                className="flex-1 bg-red-600 hover:bg-red-700"
-              >
-                {isEnding ? 'Ending...' : 'End Session'}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Session POS Dialog */}
-      <SessionPOSDialog
-        open={showPOSDialog}
-        onOpenChange={setShowPOSDialog}
-        sessionId={activeSession?.id}
-        sessionInfo={{
-          table_number: `Table ${table.table_number}`,
-          player_names: getPlayerNames()
-        }}
-      />
-    </>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Start a New Session</DialogTitle>
+                <DialogDescription>
+                  Select players and game type to start a session.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    variant={sessionType === 'single' ? 'default' : 'outline'}
+                    onClick={() => setSessionType('single')}
+                  >
+                    Single Player
+                  </Button>
+                  <Button
+                    variant={sessionType === 'double' ? 'default' : 'outline'}
+                    onClick={() => setSessionType('double')}
+                  >
+                    Two Players
+                  </Button>
+                </div>
+                
+                {sessionType === 'single' ? (
+                  <PlayerSearchInput onPlayerSelect={handlePlayerSelect} />
+                ) : (
+                  <PlayerPairSearchInput onPlayerPairSelect={handlePlayerPairSelect} />
+                )}
+                
+                <div className="grid grid-cols-1 gap-2">
+                  <Label htmlFor="gameType">Game Type</Label>
+                  <Select onValueChange={(value) => setGameTypeId(Number(value))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select game type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tablePricings.map(pricing => (
+                        <SelectItem 
+                          key={pricing.game_type_id} 
+                          value={pricing.game_type_id.toString()}
+                        >
+                          {getGameTypeLabel(pricing.game_type_id)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button onClick={handleStartSession} disabled={isStarting}>
+                  {isStarting ? 'Starting...' : 'Start Session'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+      </CardFooter>
+    </Card>
   );
 };
 
