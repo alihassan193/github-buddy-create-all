@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { History, Loader2, Eye } from "lucide-react";
 import { getTableSessions } from "@/services/sessionService";
+import { apiClient } from "@/services/apiClient";
 import { useData } from "@/context/DataContext";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
@@ -22,8 +23,9 @@ const TableSessionHistoryDialog = ({ tableId, tableNumber }: TableSessionHistory
   const [isOpen, setIsOpen] = useState(false);
   const [sessions, setSessions] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [loadingInvoice, setLoadingInvoice] = useState<number | null>(null);
 
   const fetchSessions = async () => {
     if (!clubId) return;
@@ -46,6 +48,37 @@ const TableSessionHistoryDialog = ({ tableId, tableNumber }: TableSessionHistory
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchInvoiceBySessionId = async (sessionId: number) => {
+    try {
+      setLoadingInvoice(sessionId);
+      const response = await apiClient.get(`/api/invoices/session/${sessionId}`);
+      
+      if (response.success) {
+        return response.data;
+      }
+      
+      throw new Error(response.message || 'Failed to fetch invoice');
+    } catch (error: any) {
+      console.error('Error fetching invoice:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to fetch invoice details",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setLoadingInvoice(null);
+    }
+  };
+
+  const handleViewInvoice = async (session: any) => {
+    const invoice = await fetchInvoiceBySessionId(session.session_id);
+    if (invoice) {
+      setSelectedInvoice(invoice);
+      setIsInvoiceDialogOpen(true);
     }
   };
 
@@ -80,19 +113,19 @@ const TableSessionHistoryDialog = ({ tableId, tableNumber }: TableSessionHistory
   };
 
   const formatTime = (timeString: string) => {
-    return format(new Date(timeString), 'dd/MM/yyyy HH:mm');
-  };
-
-  const handleViewInvoice = (session: any) => {
-    setSelectedSession(session);
-    setIsInvoiceDialogOpen(true);
+    if (!timeString) return 'N/A';
+    try {
+      return format(new Date(timeString), 'dd/MM/yyyy HH:mm');
+    } catch (error) {
+      return 'Invalid Date';
+    }
   };
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
         <DialogTrigger asChild>
-          <Button variant="outline" className="w-4/5 mb-2">
+          <Button variant="outline" className="w-full mb-2">
             <History className="h-4 w-4 mr-2" />
             Session History
           </Button>
@@ -138,7 +171,7 @@ const TableSessionHistoryDialog = ({ tableId, tableNumber }: TableSessionHistory
                       <TableCell className="font-medium">{session.player_1}</TableCell>
                       <TableCell className="font-medium">{session.player_2}</TableCell>
                       <TableCell>{formatTime(session.time_start)}</TableCell>
-                      <TableCell>{session.time_end ? formatTime(session.time_end) : 'N/A'}</TableCell>
+                      <TableCell>{formatTime(session.time_end)}</TableCell>
                       <TableCell>{session.total_minutes}</TableCell>
                       <TableCell>PKR {session.price}</TableCell>
                       <TableCell>{session.loser}</TableCell>
@@ -150,8 +183,13 @@ const TableSessionHistoryDialog = ({ tableId, tableNumber }: TableSessionHistory
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewInvoice(session)}
+                          disabled={loadingInvoice === session.session_id}
                         >
-                          <Eye className="h-4 w-4 mr-1" />
+                          {loadingInvoice === session.session_id ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-1" />
+                          ) : (
+                            <Eye className="h-4 w-4 mr-1" />
+                          )}
                           Invoice
                         </Button>
                       </TableCell>
@@ -168,9 +206,9 @@ const TableSessionHistoryDialog = ({ tableId, tableNumber }: TableSessionHistory
       </Dialog>
 
       {/* Invoice Detail Dialog */}
-      {selectedSession && (
+      {selectedInvoice && (
         <InvoiceDetailDialog
-          invoice={selectedSession}
+          invoice={selectedInvoice}
           isOpen={isInvoiceDialogOpen}
           onClose={() => setIsInvoiceDialogOpen(false)}
           onUpdate={fetchSessions}

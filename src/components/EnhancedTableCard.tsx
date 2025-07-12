@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from "react";
 import { SnookerTable } from "@/types";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { startSession, announceGameResult, cancelSession } from "@/services/sessionService";
-import { Play, Trophy, X, Settings, Clock, DollarSign, History } from "lucide-react";
+import { Play, Trophy, X, Settings, Clock, DollarSign, History, Users, Crown } from "lucide-react";
 import PlayerPairSearchInput from "./PlayerPairSearchInput";
 import TableSettingsDialog from "./TableSettingsDialog";
 import SessionPOSDialog from "./SessionPOSDialog";
@@ -212,13 +212,6 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     }
   };
   
-  const statusColors = {
-    available: "bg-green-500",
-    occupied: "bg-red-500",
-    maintenance: "bg-yellow-500",
-    reserved: "bg-blue-500"
-  };
-  
   const getGameTypeLabel = (gameTypeId: number) => {
     const gameType = gameTypes.find(gt => gt.id === gameTypeId);
     const pricing = tablePricings.find(p => p.game_type_id === gameTypeId);
@@ -256,18 +249,26 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
 
   const canManageTables = user?.permissions?.can_manage_tables || user?.role === 'super_admin';
   
+  // Determine the status line color - red for active sessions, green for available
+  const statusLineColor = activeSession ? 'bg-red-500' : 'bg-green-500';
+  
   return (
-    <Card className="w-full max-w-sm mx-auto bg-white border border-gray-200 rounded-lg shadow-sm">
-      <CardHeader className="pb-2">
-        <div className="flex justify-between items-start">
+    <Card className="w-full max-w-sm mx-auto bg-white border border-gray-200 rounded-lg shadow-sm relative overflow-hidden">
+      {/* Status Line */}
+      <div className={`absolute top-0 left-0 right-0 h-1 ${statusLineColor}`}></div>
+      
+      <div className="p-4">
+        {/* Header */}
+        <div className="flex justify-between items-start mb-3">
           <div>
-            <CardTitle className="text-lg font-semibold">{table.table_number}</CardTitle>
-            <CardDescription className="text-sm text-gray-600">
-              {table.table_type || 'Standard'}
-            </CardDescription>
+            <h3 className="text-lg font-semibold">{table.table_number}</h3>
+            <p className="text-sm text-gray-600">{table.table_type || 'Standard'}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge className={`${statusColors[table.status]} text-white text-xs px-2 py-1`}>
+            <Badge 
+              variant={table.status === 'available' ? 'default' : 'secondary'}
+              className={`text-xs ${table.status === 'available' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
+            >
               {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
             </Badge>
             {canManageTables && (
@@ -281,11 +282,9 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
             )}
           </div>
         </div>
-      </CardHeader>
-      
-      <CardContent className="pb-4">
+
         {/* Session History Button */}
-        <div className="flex justify-center mb-4">
+        <div className="mb-3">
           <TableSessionHistoryDialog 
             tableId={table.id} 
             tableNumber={table.table_number} 
@@ -304,16 +303,16 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
           </div>
         </div>
 
-        {/* Session Info */}
+        {/* Session Info for Active Sessions */}
         {activeSession && (
           <div className="space-y-2 mb-4">
             <div className="flex items-center text-sm text-blue-600">
-              <span className="mr-2">👥</span>
+              <Users className="h-4 w-4 mr-2" />
               <span>{activeSession.player_1_name} vs {activeSession.player_2_name}</span>
             </div>
-            <div className="flex items-center text-sm text-green-600">
-              <span className="mr-2">🏆</span>
-              <span>Frames</span>
+            <div className="flex items-center text-sm text-purple-600">
+              <Crown className="h-4 w-4 mr-2" />
+              <span>{activeSession.game_type_name || 'Game'}</span>
             </div>
             <div className="flex items-center text-sm text-gray-600">
               <Clock className="h-4 w-4 mr-2" />
@@ -326,9 +325,21 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
           </div>
         )}
 
-        {/* Action Buttons */}
+        {/* Available Game Types for Available Tables */}
+        {!activeSession && tablePricings.length > 0 && (
+          <div className="mb-4">
+            <p className="text-sm text-gray-600">
+              Available Game Types: {tablePricings.map(p => {
+                const gameType = gameTypes.find(gt => gt.id === p.game_type_id);
+                return gameType?.name;
+              }).filter(Boolean).join(', ')}
+            </p>
+          </div>
+        )}
+
+        {/* Action Buttons for Active Sessions */}
         {activeSession && (
-          <div className="space-y-2">
+          <div className="space-y-2 mb-4">
             {canCancel ? (
               <Button 
                 onClick={handleCancelSession}
@@ -341,15 +352,26 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
                 {isCancelling ? 'Cancelling...' : 'Cancel Session'}
               </Button>
             ) : (
-              <Button 
-                onClick={() => handleAnnounceResult('player_1')}
-                disabled={isAnnouncingResult}
-                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
-                size="sm"
-              >
-                <Trophy className="h-4 w-4 mr-2" />
-                Announce Loser
-              </Button>
+              <div className="space-y-2">
+                <Button 
+                  onClick={() => handleAnnounceResult('player_1')}
+                  disabled={isAnnouncingResult}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                  size="sm"
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  {activeSession.player_1_name} Lost
+                </Button>
+                <Button 
+                  onClick={() => handleAnnounceResult('player_2')}
+                  disabled={isAnnouncingResult}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                  size="sm"
+                >
+                  <Trophy className="h-4 w-4 mr-2" />
+                  {activeSession.player_2_name} Lost
+                </Button>
+              </div>
             )}
             
             <div className="flex gap-2">
@@ -373,10 +395,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
             </div>
           </div>
         )}
-      </CardContent>
+      </div>
       
-      <CardFooter className="pt-0">
-        {table.status === 'available' && (
+      {/* Footer with Start Session Button for Available Tables */}
+      {table.status === 'available' && (
+        <CardFooter className="pt-0">
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
               <Button 
@@ -423,8 +446,8 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
               </DialogFooter>
             </DialogContent>
           </Dialog>
-        )}
-      </CardFooter>
+        </CardFooter>
+      )}
 
       {/* Dialogs */}
       {canManageTables && (
