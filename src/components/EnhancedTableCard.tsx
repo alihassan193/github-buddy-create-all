@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { SnookerTable } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { startSession, announceGameResult, cancelSession } from "@/services/sessionService";
-import { Play, Trophy, X, Settings, Clock, DollarSign } from "lucide-react";
+import { Play, Trophy, X, Settings, Clock, DollarSign, History } from "lucide-react";
 import PlayerPairSearchInput from "./PlayerPairSearchInput";
 import TableSettingsDialog from "./TableSettingsDialog";
 import SessionPOSDialog from "./SessionPOSDialog";
@@ -225,9 +226,9 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     if (!gameType || !pricing) return '';
     
     if (pricing.is_unlimited) {
-      return `${gameType.name} ($${pricing.price})`;
+      return `${gameType.name} (PKR ${pricing.price})`;
     } else {
-      return `${gameType.name} ($${pricing.price}/${pricing.time_limit_minutes} min)`;
+      return `${gameType.name} (PKR ${pricing.price}/${pricing.time_limit_minutes} min)`;
     }
   };
 
@@ -256,49 +257,33 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const canManageTables = user?.permissions?.can_manage_tables || user?.role === 'super_admin';
   
   return (
-    <Card className="overflow-hidden border-2 hover:shadow-lg transition-shadow">
-      <CardHeader className={`py-4 ${table.status === 'occupied' ? 'bg-red-50' : table.status === 'maintenance' ? 'bg-yellow-50' : table.status === 'reserved' ? 'bg-blue-50' : 'bg-green-50'}`}>
+    <Card className="w-full max-w-sm mx-auto bg-white border border-gray-200 rounded-lg shadow-sm">
+      <CardHeader className="pb-2">
         <div className="flex justify-between items-start">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              {table.table_number}
-              {canManageTables && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setSettingsOpen(true)}
-                >
-                  <Settings className="h-4 w-4" />
-                </Button>
-              )}
-            </CardTitle>
-            <CardDescription>
-              {activeSession ? (
-                <div className="space-y-1">
-                  <div>{activeSession.player_1_name} vs {activeSession.player_2_name}</div>
-                  <div className="text-xs flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {getSessionDuration()}
-                  </div>
-                  <div className="text-xs flex items-center gap-1">
-                    <DollarSign className="h-3 w-3" />
-                    ${calculateCurrentPrice()}
-                  </div>
-                </div>
-              ) : (
-                tablePricings.length > 0 
-                  ? `${tablePricings.length} game types available`
-                  : 'No pricing set'
-              )}
+            <CardTitle className="text-lg font-semibold">{table.table_number}</CardTitle>
+            <CardDescription className="text-sm text-gray-600">
+              {table.table_type || 'Standard'}
             </CardDescription>
           </div>
-          <Badge className={statusColors[table.status]}>
-            {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={`${statusColors[table.status]} text-white text-xs px-2 py-1`}>
+              {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
+            </Badge>
+            {canManageTables && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSettingsOpen(true)}
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
         </div>
       </CardHeader>
       
-      <CardContent className="py-4">
+      <CardContent className="pb-4">
         {/* Session History Button */}
         <div className="flex justify-center mb-4">
           <TableSessionHistoryDialog 
@@ -306,99 +291,91 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
             tableNumber={table.table_number} 
           />
         </div>
-        
-        {/* Snooker Table Visual */}
-        <div 
-          className="flex items-center justify-center h-32 rounded-md relative overflow-hidden"
-          style={{
-            background: 'linear-gradient(135deg, #0f4c3a 0%, #1a5c4a 100%)'
-          }}
-        >
-          {/* Table rails */}
-          <div className="absolute inset-2 border-4 border-amber-600 rounded-sm">
-            {/* Pockets */}
-            <div className="absolute -top-2 -left-2 w-4 h-4 bg-black rounded-full"></div>
-            <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-black rounded-full"></div>
-            <div className="absolute -top-2 -right-2 w-4 h-4 bg-black rounded-full"></div>
-            <div className="absolute -bottom-2 -left-2 w-4 h-4 bg-black rounded-full"></div>
-            <div className="absolute -bottom-2 left-1/2 transform -translate-x-1/2 w-4 h-4 bg-black rounded-full"></div>
-            <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-black rounded-full"></div>
-            
-            {/* Balls */}
-            <div className="absolute top-1/2 left-8 transform -translate-y-1/2">
-              <div className="w-3 h-3 bg-white rounded-full border border-gray-400"></div>
-            </div>
-            <div className="absolute top-1/2 right-8 transform -translate-y-1/2">
-              <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-            </div>
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-              <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-            </div>
+
+        {/* Snooker Table Image */}
+        <div className="relative bg-green-600 rounded-lg h-32 mb-4 flex items-center justify-center">
+          <img 
+            src="/lovable-uploads/a7277e8c-fb74-4d98-ba88-46c0fc14ebbb.png" 
+            alt="Snooker Table"
+            className="w-full h-full object-cover rounded-lg"
+          />
+          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
+            {table.table_number}
           </div>
         </div>
-        
+
+        {/* Session Info */}
         {activeSession && (
-          <div className="mt-4 space-y-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCanteenOrderOpen(true)}
-              className="w-full"
-            >
-              Canteen Order
-            </Button>
-            
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setPosOpen(true)}
-              className="w-full"
-            >
-              Point of Sale
-            </Button>
+          <div className="space-y-2 mb-4">
+            <div className="flex items-center text-sm text-blue-600">
+              <span className="mr-2">👥</span>
+              <span>{activeSession.player_1_name} vs {activeSession.player_2_name}</span>
+            </div>
+            <div className="flex items-center text-sm text-green-600">
+              <span className="mr-2">🏆</span>
+              <span>Frames</span>
+            </div>
+            <div className="flex items-center text-sm text-gray-600">
+              <Clock className="h-4 w-4 mr-2" />
+              <span>{getSessionDuration()}</span>
+            </div>
+            <div className="flex items-center text-sm text-green-600">
+              <DollarSign className="h-4 w-4 mr-2" />
+              <span>PKR {calculateCurrentPrice()}.00</span>
+            </div>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        {activeSession && (
+          <div className="space-y-2">
+            {canCancel ? (
+              <Button 
+                onClick={handleCancelSession}
+                disabled={isCancelling}
+                variant="destructive"
+                size="sm"
+                className="w-full"
+              >
+                <X className="h-4 w-4 mr-2" />
+                {isCancelling ? 'Cancelling...' : 'Cancel Session'}
+              </Button>
+            ) : (
+              <Button 
+                onClick={() => handleAnnounceResult('player_1')}
+                disabled={isAnnouncingResult}
+                className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                size="sm"
+              >
+                <Trophy className="h-4 w-4 mr-2" />
+                Announce Loser
+              </Button>
+            )}
             
             <div className="flex gap-2">
-              {canCancel ? (
-                <Button 
-                  onClick={handleCancelSession}
-                  disabled={isCancelling}
-                  variant="destructive"
-                  size="sm"
-                  className="flex-1"
-                >
-                  <X className="h-4 w-4 mr-1" />
-                  {isCancelling ? 'Cancelling...' : 'Cancel Session'}
-                </Button>
-              ) : (
-                <>
-                  <Button 
-                    onClick={() => handleAnnounceResult('player_1')}
-                    disabled={isAnnouncingResult}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                  >
-                    <Trophy className="h-4 w-4 mr-1" />
-                    {activeSession.player_1_name} Lost
-                  </Button>
-                  <Button 
-                    onClick={() => handleAnnounceResult('player_2')}
-                    disabled={isAnnouncingResult}
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                  >
-                    <Trophy className="h-4 w-4 mr-1" />
-                    {activeSession.player_2_name} Lost
-                  </Button>
-                </>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setCanteenOrderOpen(true)}
+                className="flex-1"
+              >
+                Canteen Order
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPosOpen(true)}
+                className="flex-1"
+              >
+                <span>🛒</span>
+              </Button>
             </div>
           </div>
         )}
       </CardContent>
       
-      <CardFooter className="flex justify-center py-4">
+      <CardFooter className="pt-0">
         {table.status === 'available' && (
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
