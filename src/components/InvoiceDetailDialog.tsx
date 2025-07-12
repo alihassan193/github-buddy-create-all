@@ -17,6 +17,32 @@ interface InvoiceDetailDialogProps {
   onUpdate: () => void;
 }
 
+const formatDate = (dateValue: any): string => {
+  if (!dateValue) return 'N/A';
+  
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return 'N/A';
+    return format(date, 'MMM dd, yyyy HH:mm');
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
+const formatDateForPrint = (dateValue: any): string => {
+  if (!dateValue) return 'N/A';
+  
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) return 'N/A';
+    return format(date, 'dd/MM/yyyy HH:mm');
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    return 'N/A';
+  }
+};
+
 export const InvoiceDetailDialog = ({ invoice, isOpen, onClose, onUpdate }: InvoiceDetailDialogProps) => {
   const { toast } = useToast();
   const [newPaymentStatus, setNewPaymentStatus] = useState(invoice?.payment_status || 'pending');
@@ -78,7 +104,7 @@ export const InvoiceDetailDialog = ({ invoice, isOpen, onClose, onUpdate }: Invo
             <div class="header">
               <h2>${invoice.club?.name || 'SNOOKER CLUB'}</h2>
               <div>Invoice #: ${invoice.invoice_number}</div>
-              <div>Date: ${format(new Date(invoice.createdAt), 'dd/MM/yyyy HH:mm')}</div>
+              <div>Date: ${formatDateForPrint(invoice.createdAt)}</div>
             </div>
             
             <div class="row">
@@ -226,7 +252,7 @@ export const InvoiceDetailDialog = ({ invoice, isOpen, onClose, onUpdate }: Invo
               </div>
               <div className="flex justify-between">
                 <span className="font-medium">Date:</span>
-                <span>{format(new Date(invoice.createdAt), 'MMM dd, yyyy HH:mm')}</span>
+                <span>{formatDate(invoice.createdAt)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-medium">Customer:</span>
