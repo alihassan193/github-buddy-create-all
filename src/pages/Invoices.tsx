@@ -291,9 +291,10 @@ const Invoices = () => {
       {/* Invoice Detail Dialog */}
       {selectedSession && (
         <InvoiceDetailDialog
-          session={selectedSession}
+          invoice={selectedSession}
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
+          onUpdate={fetchSessions}
         />
       )}
     </div>

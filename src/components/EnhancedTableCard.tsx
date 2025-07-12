@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { SnookerTable } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -43,6 +42,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const [canCancel, setCanCancel] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [posOpen, setPosOpen] = useState(false);
+  const [canteenOrderOpen, setCanteenOrderOpen] = useState(false);
   
   // Filter pricing for this table
   const tablePricings = gamePricings.filter(p => p.table_id === table.id);
@@ -304,7 +304,14 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         
         {activeSession && (
           <div className="mt-4 space-y-2">
-            <CanteenOrderDialog session={activeSession} />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCanteenOrderOpen(true)}
+              className="w-full"
+            >
+              Canteen Order
+            </Button>
             
             <Button
               variant="outline"
@@ -436,15 +443,23 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       )}
       
       {activeSession && (
-        <SessionPOSDialog
-          open={posOpen}
-          onOpenChange={setPosOpen}
-          sessionId={activeSession.id}
-          sessionInfo={{
-            table_number: table.table_number,
-            player_names: `${activeSession.player_1_name} vs ${activeSession.player_2_name}`
-          }}
-        />
+        <>
+          <CanteenOrderDialog
+            open={canteenOrderOpen}
+            onOpenChange={setCanteenOrderOpen}
+            session={activeSession}
+          />
+          
+          <SessionPOSDialog
+            open={posOpen}
+            onOpenChange={setPosOpen}
+            sessionId={activeSession.id}
+            sessionInfo={{
+              table_number: table.table_number,
+              player_names: `${activeSession.player_1_name} vs ${activeSession.player_2_name}`
+            }}
+          />
+        </>
       )}
     </Card>
   );
