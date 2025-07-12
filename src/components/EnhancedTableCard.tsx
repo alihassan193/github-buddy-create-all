@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+
+import { useState, useEffect } from "react";
 import { SnookerTable } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,6 @@ import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
 import { startSession, announceGameResult, cancelSession } from "@/services/sessionService";
 import { Play, Trophy, X, Settings, Clock } from "lucide-react";
-import PlayerSearchInput from "./PlayerSearchInput";
 import PlayerPairSearchInput from "./PlayerPairSearchInput";
 import TableSettingsDialog from "./TableSettingsDialog";
 import SessionPOSDialog from "./SessionPOSDialog";
@@ -30,12 +30,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [gameTypeId, setGameTypeId] = useState<number | null>(null);
-  const [selectedPlayer, setSelectedPlayer] = useState<any>(null);
+  const [selectedPlayer1, setSelectedPlayer1] = useState<any>(null);
   const [selectedPlayer2, setSelectedPlayer2] = useState<any>(null);
-  const [playerName, setPlayerName] = useState('');
+  const [player1Name, setPlayer1Name] = useState('');
   const [player2Name, setPlayer2Name] = useState('');
   const [isStarting, setIsStarting] = useState(false);
-  const [sessionType, setSessionType] = useState<'single' | 'double'>('single');
   const [isAnnouncingResult, setIsAnnouncingResult] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
@@ -69,16 +68,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       return () => clearInterval(interval);
     }
   }, [activeSession]);
-  
-  const handlePlayerSelect = (player: any, name: string) => {
-    setSelectedPlayer(player);
-    setPlayerName(name);
-  };
 
   const handlePlayersSelect = (player1: any, player2: any) => {
-    setSelectedPlayer(player1);
+    setSelectedPlayer1(player1);
     setSelectedPlayer2(player2);
-    setPlayerName(player1?.first_name && player1?.last_name ? `${player1.first_name} ${player1.last_name}` : '');
+    setPlayer1Name(player1?.first_name && player1?.last_name ? `${player1.first_name} ${player1.last_name}` : '');
     setPlayer2Name(player2?.first_name && player2?.last_name ? `${player2.first_name} ${player2.last_name}` : '');
   };
   
@@ -92,16 +86,16 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       return;
     }
     
-    if (!playerName.trim()) {
+    if (!player1Name.trim()) {
       toast({
         title: "Error",
-        description: "Please enter or select a player",
+        description: "Please enter or select first player",
         variant: "destructive",
       });
       return;
     }
 
-    if (sessionType === 'double' && !player2Name.trim()) {
+    if (!player2Name.trim()) {
       toast({
         title: "Error",
         description: "Please enter or select second player",
@@ -129,14 +123,10 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         pricing_id: selectedPricing.id,
         club_id: clubId || 1,
         estimated_duration: 120,
-        is_guest: !selectedPlayer,
-        ...(selectedPlayer && { player_id: selectedPlayer.id }),
-        ...((!selectedPlayer && playerName.trim()) && { guest_player_name: playerName.trim() }),
-        ...(sessionType === 'double' && {
-          player_2_id: selectedPlayer2?.id,
-          is_guest_2: !selectedPlayer2,
-          ...((!selectedPlayer2 && player2Name.trim()) && { guest_player_2_name: player2Name.trim() })
-        })
+        ...(selectedPlayer1 && { player_id: selectedPlayer1.id }),
+        ...((!selectedPlayer1 && player1Name.trim()) && { guest_player_name: player1Name.trim() }),
+        ...(selectedPlayer2 && { player_2_id: selectedPlayer2.id }),
+        ...((!selectedPlayer2 && player2Name.trim()) && { guest_player_2_name: player2Name.trim() })
       };
 
       await startSession(sessionData);
@@ -147,9 +137,9 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       });
       
       setOpen(false);
-      setPlayerName('');
+      setPlayer1Name('');
       setPlayer2Name('');
-      setSelectedPlayer(null);
+      setSelectedPlayer1(null);
       setSelectedPlayer2(null);
       setGameTypeId(null);
       
@@ -379,30 +369,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
               <DialogHeader>
                 <DialogTitle>Start a New Session</DialogTitle>
                 <DialogDescription>
-                  Select players and game type to start a session.
+                  Select two players and game type to start a session.
                 </DialogDescription>
               </DialogHeader>
               <div className="grid gap-4">
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant={sessionType === 'single' ? 'default' : 'outline'}
-                    onClick={() => setSessionType('single')}
-                  >
-                    Single Player
-                  </Button>
-                  <Button
-                    variant={sessionType === 'double' ? 'default' : 'outline'}
-                    onClick={() => setSessionType('double')}
-                  >
-                    Two Players
-                  </Button>
-                </div>
-                
-                {sessionType === 'single' ? (
-                  <PlayerSearchInput onPlayerSelect={handlePlayerSelect} />
-                ) : (
-                  <PlayerPairSearchInput onPlayersSelect={handlePlayersSelect} />
-                )}
+                <PlayerPairSearchInput onPlayersSelect={handlePlayersSelect} />
                 
                 <div className="grid grid-cols-1 gap-2">
                   <Label htmlFor="gameType">Game Type</Label>

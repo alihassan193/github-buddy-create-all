@@ -167,7 +167,9 @@ export const startSession = async (sessionData: {
   player_id?: number;
   guest_player_name?: string;
   guest_player_phone?: string;
-  is_guest?: boolean;
+  player_2_id?: number;
+  guest_player_2_name?: string;
+  guest_player_2_phone?: string;
   pricing_id: number;
   club_id: number;
   estimated_duration?: number;
@@ -184,7 +186,9 @@ export const startSession = async (sessionData: {
       ...(sessionData.player_id && { player_id: sessionData.player_id }),
       ...(sessionData.guest_player_name && { guest_player_name: sessionData.guest_player_name }),
       ...(sessionData.guest_player_phone && { guest_player_phone: sessionData.guest_player_phone }),
-      ...(sessionData.is_guest !== undefined && { is_guest: sessionData.is_guest })
+      ...(sessionData.player_2_id && { player_2_id: sessionData.player_2_id }),
+      ...(sessionData.guest_player_2_name && { guest_player_2_name: sessionData.guest_player_2_name }),
+      ...(sessionData.guest_player_2_phone && { guest_player_2_phone: sessionData.guest_player_2_phone })
     };
 
     const response = await apiClient.post('/api/sessions', requestData);

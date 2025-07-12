@@ -44,7 +44,7 @@ const PlayerPairSearchInput = ({ onPlayersSelect }: PlayerPairSearchInputProps) 
           <Label>Player 1</Label>
           <PlayerSearchInput 
             onPlayerSelect={handlePlayer1Select}
-            placeholder="Search for first player..."
+            placeholder="Search for first player or enter guest name..."
           />
         </div>
         
@@ -52,7 +52,7 @@ const PlayerPairSearchInput = ({ onPlayersSelect }: PlayerPairSearchInputProps) 
           <Label>Player 2</Label>
           <PlayerSearchInput 
             onPlayerSelect={handlePlayer2Select}
-            placeholder="Search for second player..."
+            placeholder="Search for second player or enter guest name..."
           />
         </div>
       </CardContent>
