@@ -253,21 +253,31 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const statusLineColor = activeSession ? 'bg-red-500' : 'bg-green-500';
   
   return (
-    <Card className="w-full max-w-sm mx-auto bg-white border border-gray-200 rounded-lg shadow-sm relative overflow-hidden">
-      {/* Status Line */}
-      <div className={`absolute top-0 left-0 right-0 h-1 ${statusLineColor}`}></div>
+    <Card className="w-full max-w-sm mx-auto border border-gray-200 rounded-lg shadow-sm relative overflow-hidden h-80">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url(/bg-snooker.webp)' }}
+      />
       
-      <div className="p-4">
+      {/* Dark Overlay for better text readability */}
+      <div className="absolute inset-0 bg-black/40" />
+      
+      {/* Status Line */}
+      <div className={`absolute top-0 left-0 right-0 h-1 ${statusLineColor} z-20`}></div>
+      
+      {/* Content Container */}
+      <div className="relative z-10 p-4 h-full flex flex-col">
         {/* Header */}
         <div className="flex justify-between items-start mb-3">
           <div>
-            <h3 className="text-lg font-semibold">{table.table_number}</h3>
-            <p className="text-sm text-gray-600">{table.table_type || 'Standard'}</p>
+            <h3 className="text-lg font-semibold text-white drop-shadow-lg">{table.table_number}</h3>
+            <p className="text-sm text-white/90 drop-shadow-md">{table.table_type || 'Standard'}</p>
           </div>
           <div className="flex items-center gap-2">
             <Badge 
               variant={table.status === 'available' ? 'default' : 'secondary'}
-              className={`text-xs ${table.status === 'available' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
+              className={`text-xs shadow-lg ${table.status === 'available' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
             >
               {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
             </Badge>
@@ -276,6 +286,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
                 variant="ghost"
                 size="sm"
                 onClick={() => setSettingsOpen(true)}
+                className="text-white hover:bg-white/20"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -291,34 +302,22 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
           />
         </div>
 
-        {/* Snooker Table Image */}
-        <div className="relative bg-green-600 rounded-lg h-32 mb-4 flex items-center justify-center">
-          <img 
-            src="/lovable-uploads/a7277e8c-fb74-4d98-ba88-46c0fc14ebbb.png" 
-            alt="Snooker Table"
-            className="w-full h-full object-cover rounded-lg"
-          />
-          <div className="absolute bottom-2 left-2 bg-black bg-opacity-60 text-white px-2 py-1 rounded text-xs">
-            {table.table_number}
-          </div>
-        </div>
-
         {/* Session Info for Active Sessions */}
         {activeSession && (
           <div className="space-y-2 mb-4">
-            <div className="flex items-center text-sm text-blue-600">
+            <div className="flex items-center text-sm text-blue-200 drop-shadow-md">
               <Users className="h-4 w-4 mr-2" />
               <span>{activeSession.player_1_name} vs {activeSession.player_2_name}</span>
             </div>
-            <div className="flex items-center text-sm text-purple-600">
+            <div className="flex items-center text-sm text-purple-200 drop-shadow-md">
               <Crown className="h-4 w-4 mr-2" />
               <span>{activeSession.game_type_name || 'Game'}</span>
             </div>
-            <div className="flex items-center text-sm text-gray-600">
+            <div className="flex items-center text-sm text-white/90 drop-shadow-md">
               <Clock className="h-4 w-4 mr-2" />
               <span>{getSessionDuration()}</span>
             </div>
-            <div className="flex items-center text-sm text-green-600">
+            <div className="flex items-center text-sm text-green-200 drop-shadow-md">
               <DollarSign className="h-4 w-4 mr-2" />
               <span>PKR {calculateCurrentPrice()}.00</span>
             </div>
@@ -328,7 +327,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         {/* Available Game Types for Available Tables */}
         {!activeSession && tablePricings.length > 0 && (
           <div className="mb-4">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-white/80 drop-shadow-md">
               Available Game Types: {tablePricings.map(p => {
                 const gameType = gameTypes.find(gt => gt.id === p.game_type_id);
                 return gameType?.name;
@@ -395,59 +394,60 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
             </div>
           </div>
         )}
-      </div>
-      
-      {/* Footer with Start Session Button for Available Tables */}
-      {table.status === 'available' && (
-        <CardFooter className="pt-0">
-          <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button 
-                disabled={tablePricings.length === 0}
-                className="w-full"
-              >
-                <Play className="h-4 w-4 mr-2" />
-                {tablePricings.length === 0 ? "No Game Types Available" : "Start Session"}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Start a New Session</DialogTitle>
-                <DialogDescription>
-                  Select two players and game type to start a session.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4">
-                <PlayerPairSearchInput onPlayersSelect={handlePlayersSelect} />
-                
-                <div className="grid grid-cols-1 gap-2">
-                  <Label htmlFor="gameType">Game Type</Label>
-                  <Select onValueChange={(value) => setGameTypeId(Number(value))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select game type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tablePricings.map(pricing => (
-                        <SelectItem 
-                          key={pricing.game_type_id} 
-                          value={pricing.game_type_id.toString()}
-                        >
-                          {getGameTypeLabel(pricing.game_type_id)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button onClick={handleStartSession} disabled={isStarting}>
-                  {isStarting ? 'Starting...' : 'Start Session'}
+        
+        {/* Footer with Start Session Button for Available Tables */}
+        {table.status === 'available' && (
+          <div className="mt-auto">
+            <Dialog open={open} onOpenChange={setOpen}>
+              <DialogTrigger asChild>
+                <Button 
+                  disabled={tablePricings.length === 0}
+                  className="w-full bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 transition-all duration-200 font-semibold shadow-lg"
+                  variant="outline"
+                >
+                  <Play className="h-4 w-4 mr-2" />
+                  {tablePricings.length === 0 ? "No Game Types Available" : "Start Session"}
                 </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </CardFooter>
-      )}
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Start a New Session</DialogTitle>
+                  <DialogDescription>
+                    Select two players and game type to start a session.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-4">
+                  <PlayerPairSearchInput onPlayersSelect={handlePlayersSelect} />
+                  
+                  <div className="grid grid-cols-1 gap-2">
+                    <Label htmlFor="gameType">Game Type</Label>
+                    <Select onValueChange={(value) => setGameTypeId(Number(value))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select game type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tablePricings.map(pricing => (
+                          <SelectItem 
+                            key={pricing.game_type_id} 
+                            value={pricing.game_type_id.toString()}
+                          >
+                            {getGameTypeLabel(pricing.game_type_id)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button onClick={handleStartSession} disabled={isStarting}>
+                    {isStarting ? 'Starting...' : 'Start Session'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
+        )}
+      </div>
 
       {/* Dialogs */}
       {canManageTables && (

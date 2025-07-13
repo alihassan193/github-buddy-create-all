@@ -121,50 +121,66 @@ const TableCard = ({ table }: TableCardProps) => {
   };
   
   return (
-    <Card className="overflow-hidden border-2 hover:shadow-lg transition-shadow">
-      <CardHeader className={`py-4 ${table.status === 'occupied' ? 'bg-red-50' : table.status === 'maintenance' ? 'bg-yellow-50' : 'bg-green-50'}`}>
-        <div className="flex justify-between items-start">
-          <div>
-            <CardTitle>{table.table_number}</CardTitle>
-            <CardDescription>
-              {tablePricings.length > 0 
-                ? `${tablePricings.length} game types available`
-                : 'No pricing set'
-              }
-            </CardDescription>
-          </div>
-          <Badge className={statusColors[table.status]}>
-            {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="py-4">
-        <div className="flex items-center justify-center h-32 felt-bg rounded-md">
-          <div className="grid grid-cols-3 w-full h-full">
-            <div className="flex items-center justify-center">
-              <div className="w-6 h-6 bg-snooker-red rounded-full"></div>
+    <Card className="overflow-hidden border-2 hover:shadow-lg transition-shadow relative h-80">
+      {/* Background Image */}
+      <div 
+        className="absolute inset-0 bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: 'url(/bg-snooker.webp)' }}
+      />
+      
+      {/* Dark Overlay for better text readability */}
+      <div className="absolute inset-0 bg-black/40" />
+      
+      {/* Content Container */}
+      <div className="relative z-10 h-full flex flex-col">
+        <CardHeader className="py-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <CardTitle className="text-white text-2xl font-bold drop-shadow-lg">
+                {table.table_number}
+              </CardTitle>
+              <CardDescription className="text-white/90 font-medium drop-shadow-md">
+                {tablePricings.length > 0 
+                  ? `${tablePricings.length} game types available`
+                  : 'No pricing set'
+                }
+              </CardDescription>
             </div>
-            <div className="flex items-center justify-center">
-              <div className="w-6 h-6 bg-white rounded-full"></div>
-            </div>
-            <div className="flex items-center justify-center">
-              <div className="w-6 h-6 bg-black rounded-full"></div>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-      <CardFooter className="flex justify-center py-4">
-        <Dialog open={open} onOpenChange={setOpen}>
-          <DialogTrigger asChild>
-            <Button 
-              disabled={table.status !== 'available' || tablePricings.length === 0}
-              className="w-full"
+            <Badge 
+              className={`${statusColors[table.status]} text-white font-semibold shadow-lg`}
             >
-              {table.status === 'available' 
-                ? tablePricings.length === 0 ? "No Game Types Available" : "Start Session" 
-                : "Table Busy"}
-            </Button>
-          </DialogTrigger>
+              {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
+            </Badge>
+          </div>
+        </CardHeader>
+        
+        <CardContent className="flex-1 flex items-center justify-center py-4">
+          <div className="grid grid-cols-3 gap-4">
+            <div className="flex items-center justify-center">
+              <div className="w-8 h-8 bg-red-600 rounded-full shadow-lg border-2 border-white/50"></div>
+            </div>
+            <div className="flex items-center justify-center">
+              <div className="w-8 h-8 bg-white rounded-full shadow-lg border-2 border-black/20"></div>
+            </div>
+            <div className="flex items-center justify-center">
+              <div className="w-8 h-8 bg-black rounded-full shadow-lg border-2 border-white/50"></div>
+            </div>
+          </div>
+        </CardContent>
+        
+        <CardFooter className="flex justify-center py-4">
+          <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+              <Button 
+                disabled={table.status !== 'available' || tablePricings.length === 0}
+                className="w-full bg-white/20 backdrop-blur-sm border border-white/30 text-white hover:bg-white/30 transition-all duration-200 font-semibold shadow-lg"
+                variant="outline"
+              >
+                {table.status === 'available' 
+                  ? tablePricings.length === 0 ? "No Game Types Available" : "Start Session" 
+                  : "Table Busy"}
+              </Button>
+            </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Start a New Session</DialogTitle>
@@ -200,7 +216,8 @@ const TableCard = ({ table }: TableCardProps) => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
-      </CardFooter>
+        </CardFooter>
+      </div>
     </Card>
   );
 };
