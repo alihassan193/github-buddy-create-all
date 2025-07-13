@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { SnookerTable } from "@/types";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useData } from "@/context/DataContext";
 import { useAuth } from "@/context/AuthContext";
-import { startSession, announceGameResult, cancelSession } from "@/services/sessionService";
+import { startSession, announceGameResult, cancelSession, endSession } from "@/services/sessionService";
 import { Play, Trophy, X, Settings, Clock, DollarSign, History, Users, Crown } from "lucide-react";
 import PlayerPairSearchInput from "./PlayerPairSearchInput";
 import TableSettingsDialog from "./TableSettingsDialog";
@@ -155,7 +156,8 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       setSelectedPlayer2(null);
       setGameTypeId(null);
       
-      refreshTables();
+      // Force refresh to show changes immediately
+      await refreshTables();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -179,7 +181,8 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         description: "The session has been cancelled successfully",
       });
       
-      refreshTables();
+      // Force refresh to show changes immediately
+      await refreshTables();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -196,17 +199,21 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     
     setIsAnnouncingResult(true);
     try {
+      // First announce the result
       await announceGameResult(activeSession.id, loserPlayer);
+      
+      // Then end the session
+      await endSession(activeSession.id);
       
       toast({
         title: "Game Completed",
-        description: "Game result has been announced successfully",
+        description: "Game result has been announced and session ended",
       });
       
       // Fetch and show invoice after ending session
       try {
         const invoiceResponse = await getInvoiceBySessionId(activeSession.id);
-        setInvoiceData(invoiceResponse.data);
+        setInvoiceData(invoiceResponse);
         setInvoiceDialogOpen(true);
       } catch (invoiceError) {
         console.error('Error fetching invoice:', invoiceError);
@@ -217,7 +224,8 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         });
       }
       
-      refreshTables();
+      // Force refresh to show changes immediately
+      await refreshTables();
     } catch (error: any) {
       toast({
         title: "Error",
@@ -246,7 +254,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     if (!activeSession?.start_time) return '';
     
     const startTime = new Date(activeSession.start_time);
-    const now = new Date();
+    const now = currentTime;
     const diffInSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
     
     const hours = Math.floor(diffInSeconds / 3600);
@@ -283,6 +291,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   
   // Status line color based on session status
   const statusLineColor = activeSession ? 'bg-red-500' : 'bg-green-500';
+  
+  // Get player names with fallback
+  const getPlayerName = (playerName: string | null | undefined, fallback: string = 'Guest') => {
+    return playerName && playerName.trim() ? playerName : fallback;
+  };
   
   return (
     <Card className="w-full max-w-sm mx-auto border border-gray-200 rounded-lg shadow-sm relative overflow-hidden h-80">
@@ -339,7 +352,9 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
           <div className="space-y-1 mb-3 flex-1">
             <div className="flex items-center text-sm text-blue-200 drop-shadow-md">
               <Users className="h-3 w-3 mr-1" />
-              <span className="text-xs">{activeSession.player_1_name} vs {activeSession.player_2_name}</span>
+              <span className="text-xs">
+                {getPlayerName(activeSession.player_1_name)} vs {getPlayerName(activeSession.player_2_name)}
+              </span>
             </div>
             <div className="flex items-center text-sm text-purple-200 drop-shadow-md">
               <Crown className="h-3 w-3 mr-1" />
@@ -371,7 +386,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         {/* Action Buttons for Active Sessions */}
         {activeSession && (
           <div className="space-y-2 mt-auto">
-            {canCancel ? (
+            {canCancel && (
               <Button 
                 onClick={handleCancelSession}
                 disabled={isCancelling}
@@ -380,9 +395,11 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
                 className="w-full h-8 text-xs"
               >
                 <X className="h-3 w-3 mr-1" />
-                {isCancelling ? 'Cancelling...' : 'Cancel'}
+                {isCancelling ? 'Cancelling...' : 'Cancel Session'}
               </Button>
-            ) : (
+            )}
+            
+            {!canCancel && (
               <div className="space-y-1">
                 <Button 
                   onClick={() => handleAnnounceResult('player_1')}
@@ -391,7 +408,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
                   size="sm"
                 >
                   <Trophy className="h-3 w-3 mr-1" />
-                  {activeSession.player_1_name} Lost
+                  {getPlayerName(activeSession.player_1_name)} Lost
                 </Button>
                 <Button 
                   onClick={() => handleAnnounceResult('player_2')}
@@ -400,7 +417,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
                   size="sm"
                 >
                   <Trophy className="h-3 w-3 mr-1" />
-                  {activeSession.player_2_name} Lost
+                  {getPlayerName(activeSession.player_2_name)} Lost
                 </Button>
               </div>
             )}
@@ -504,7 +521,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
             sessionId={activeSession.id}
             sessionInfo={{
               table_number: table.table_number,
-              player_names: `${activeSession.player_1_name} vs ${activeSession.player_2_name}`
+              player_names: `${getPlayerName(activeSession.player_1_name)} vs ${getPlayerName(activeSession.player_2_name)}`
             }}
           />
         </>
