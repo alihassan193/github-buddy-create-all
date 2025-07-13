@@ -240,8 +240,8 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       setShowEndSessionDialog(false);
       
       // Show invoice if available in response
-      if (response?.invoice) {
-        setInvoiceData(response.invoice);
+      if (response?.data?.invoice) {
+        setInvoiceData(response.data.invoice);
         setInvoiceDialogOpen(true);
       } else {
         // Try to fetch invoice by session ID
@@ -251,12 +251,16 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
           setInvoiceDialogOpen(true);
         } catch (invoiceError) {
           console.error('Error fetching invoice:', invoiceError);
+          // If no invoice found, refresh immediately
+          await refreshTables();
+          window.location.reload();
         }
       }
       
-      // Force refresh to show changes immediately
-      await refreshTables();
-      window.location.reload();
+      // Force refresh to show changes immediately (only if no invoice dialog)
+      if (!response?.data?.invoice) {
+        await refreshTables();
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -605,9 +609,12 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         <InvoiceDetailDialog
           invoice={invoiceData}
           isOpen={invoiceDialogOpen}
-          onClose={() => {
+          onClose={async () => {
             setInvoiceDialogOpen(false);
             setInvoiceData(null);
+            // Refresh page only when invoice dialog is closed
+            await refreshTables();
+            window.location.reload();
           }}
           onUpdate={() => {}}
         />
