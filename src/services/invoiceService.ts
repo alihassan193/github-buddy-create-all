@@ -1,4 +1,3 @@
-
 import { apiClient } from './apiClient';
 
 // Create invoice - matches /api/invoices endpoint
@@ -102,4 +101,9 @@ export const deleteInvoice = async (id: number): Promise<void> => {
     console.error('Error deleting invoice:', error);
     throw error;
   }
+};
+
+export const getInvoiceBySessionId = async (sessionId: number) => {
+  const response = await apiClient.get(`/invoices/session/${sessionId}`);
+  return response.data;
 };

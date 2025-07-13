@@ -18,6 +18,7 @@ import CanteenOrderDialog from "./CanteenOrderDialog";
 import { formatDistanceToNow } from "date-fns";
 import TableSessionHistoryDialog from "./TableSessionHistoryDialog";
 import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
+import { getInvoiceBySessionId } from "@/services/invoiceService";
 
 interface EnhancedTableCardProps {
   table: SnookerTable;
@@ -43,7 +44,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const [posOpen, setPosOpen] = useState(false);
   const [canteenOrderOpen, setCanteenOrderOpen] = useState(false);
   const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
-  const [sessionIdForInvoice, setSessionIdForInvoice] = useState<number | null>(null);
+  const [invoiceData, setInvoiceData] = useState<any>(null);
   
   // Filter pricing for this table
   const tablePricings = gamePricings.filter(p => p.table_id === table.id);
@@ -202,9 +203,19 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         description: "Game result has been announced successfully",
       });
       
-      // Show invoice after ending session
-      setSessionIdForInvoice(activeSession.id);
-      setInvoiceDialogOpen(true);
+      // Fetch and show invoice after ending session
+      try {
+        const invoiceResponse = await getInvoiceBySessionId(activeSession.id);
+        setInvoiceData(invoiceResponse.data);
+        setInvoiceDialogOpen(true);
+      } catch (invoiceError) {
+        console.error('Error fetching invoice:', invoiceError);
+        toast({
+          title: "Warning",
+          description: "Session ended but invoice could not be retrieved",
+          variant: "destructive",
+        });
+      }
       
       refreshTables();
     } catch (error: any) {
@@ -500,16 +511,15 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       )}
 
       {/* Invoice Dialog */}
-      {sessionIdForInvoice && (
+      {invoiceData && (
         <InvoiceDetailDialog
-          invoice={null}
+          invoice={invoiceData}
           isOpen={invoiceDialogOpen}
           onClose={() => {
             setInvoiceDialogOpen(false);
-            setSessionIdForInvoice(null);
+            setInvoiceData(null);
           }}
           onUpdate={() => {}}
-          sessionId={sessionIdForInvoice}
         />
       )}
     </Card>
