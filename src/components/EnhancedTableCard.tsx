@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { SnookerTable } from "@/types";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -18,7 +17,7 @@ import SessionPOSDialog from "./SessionPOSDialog";
 import CanteenOrderDialog from "./CanteenOrderDialog";
 import { formatDistanceToNow } from "date-fns";
 import TableSessionHistoryDialog from "./TableSessionHistoryDialog";
-import InvoiceDetailDialog from "./InvoiceDetailDialog";
+import { InvoiceDetailDialog } from "./InvoiceDetailDialog";
 
 interface EnhancedTableCardProps {
   table: SnookerTable;
@@ -503,8 +502,13 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       {/* Invoice Dialog */}
       {sessionIdForInvoice && (
         <InvoiceDetailDialog
-          open={invoiceDialogOpen}
-          onOpenChange={setInvoiceDialogOpen}
+          invoice={null}
+          isOpen={invoiceDialogOpen}
+          onClose={() => {
+            setInvoiceDialogOpen(false);
+            setSessionIdForInvoice(null);
+          }}
+          onUpdate={() => {}}
           sessionId={sessionIdForInvoice}
         />
       )}
