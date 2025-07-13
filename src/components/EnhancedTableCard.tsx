@@ -18,6 +18,7 @@ import SessionPOSDialog from "./SessionPOSDialog";
 import CanteenOrderDialog from "./CanteenOrderDialog";
 import { formatDistanceToNow } from "date-fns";
 import TableSessionHistoryDialog from "./TableSessionHistoryDialog";
+import InvoiceDetailDialog from "./InvoiceDetailDialog";
 
 interface EnhancedTableCardProps {
   table: SnookerTable;
@@ -37,12 +38,13 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   const [isStarting, setIsStarting] = useState(false);
   const [isAnnouncingResult, setIsAnnouncingResult] = useState(false);
   const [isCancelling, setIsCancelling] = useState(false);
-  const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [canCancel, setCanCancel] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [posOpen, setPosOpen] = useState(false);
   const [canteenOrderOpen, setCanteenOrderOpen] = useState(false);
+  const [invoiceDialogOpen, setInvoiceDialogOpen] = useState(false);
+  const [sessionIdForInvoice, setSessionIdForInvoice] = useState<number | null>(null);
   
   // Filter pricing for this table
   const tablePricings = gamePricings.filter(p => p.table_id === table.id);
@@ -63,7 +65,6 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
   useEffect(() => {
     if (activeSession?.start_time) {
       const startTime = new Date(activeSession.start_time);
-      setSessionStartTime(startTime);
       
       const checkCancelTimeout = () => {
         const now = new Date();
@@ -76,6 +77,8 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       const interval = setInterval(checkCancelTimeout, 1000);
       
       return () => clearInterval(interval);
+    } else {
+      setCanCancel(false);
     }
   }, [activeSession]);
 
@@ -196,9 +199,13 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       await announceGameResult(activeSession.id, loserPlayer);
       
       toast({
-        title: "Result Announced",
+        title: "Game Completed",
         description: "Game result has been announced successfully",
       });
+      
+      // Show invoice after ending session
+      setSessionIdForInvoice(activeSession.id);
+      setInvoiceDialogOpen(true);
       
       refreshTables();
     } catch (error: any) {
@@ -227,7 +234,22 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
 
   const getSessionDuration = () => {
     if (!activeSession?.start_time) return '';
-    return formatDistanceToNow(new Date(activeSession.start_time), { addSuffix: false });
+    
+    const startTime = new Date(activeSession.start_time);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - startTime.getTime()) / 1000);
+    
+    const hours = Math.floor(diffInSeconds / 3600);
+    const minutes = Math.floor((diffInSeconds % 3600) / 60);
+    const seconds = diffInSeconds % 60;
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
   };
 
   const calculateCurrentPrice = () => {
@@ -244,12 +266,12 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
     const elapsedMinutes = Math.floor((currentTime.getTime() - startTime.getTime()) / (1000 * 60));
     const timeBlocks = Math.ceil(elapsedMinutes / pricing.time_limit_minutes);
     
-    return timeBlocks * pricing.price;
+    return Math.max(timeBlocks * pricing.price, pricing.price); // At least one block
   };
 
   const canManageTables = user?.permissions?.can_manage_tables || user?.role === 'super_admin';
   
-  // Determine the status line color - red for active sessions, green for available
+  // Status line color based on session status
   const statusLineColor = activeSession ? 'bg-red-500' : 'bg-green-500';
   
   return (
@@ -260,7 +282,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         style={{ backgroundImage: 'url(/bg-snooker.webp)' }}
       />
       
-      {/* Dark Overlay for better text readability */}
+      {/* Dark Overlay */}
       <div className="absolute inset-0 bg-black/40" />
       
       {/* Status Line */}
@@ -269,7 +291,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
       {/* Content Container */}
       <div className="relative z-10 p-4 h-full flex flex-col">
         {/* Header */}
-        <div className="flex justify-between items-start mb-3">
+        <div className="flex justify-between items-start mb-2">
           <div>
             <h3 className="text-lg font-semibold text-white drop-shadow-lg">{table.table_number}</h3>
             <p className="text-sm text-white/90 drop-shadow-md">{table.table_type || 'Standard'}</p>
@@ -279,14 +301,14 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
               variant={table.status === 'available' ? 'default' : 'secondary'}
               className={`text-xs shadow-lg ${table.status === 'available' ? 'bg-green-500 text-white' : 'bg-red-500 text-white'}`}
             >
-              {table.status.charAt(0).toUpperCase() + table.status.slice(1)}
+              {table.status === 'occupied' ? 'Occupied' : table.status.charAt(0).toUpperCase() + table.status.slice(1)}
             </Badge>
             {canManageTables && (
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setSettingsOpen(true)}
-                className="text-white hover:bg-white/20"
+                className="text-white hover:bg-white/20 p-1"
               >
                 <Settings className="h-4 w-4" />
               </Button>
@@ -295,7 +317,7 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
         </div>
 
         {/* Session History Button */}
-        <div className="mb-3">
+        <div className="mb-2">
           <TableSessionHistoryDialog 
             tableId={table.id} 
             tableNumber={table.table_number} 
@@ -304,31 +326,31 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
 
         {/* Session Info for Active Sessions */}
         {activeSession && (
-          <div className="space-y-2 mb-4">
+          <div className="space-y-1 mb-3 flex-1">
             <div className="flex items-center text-sm text-blue-200 drop-shadow-md">
-              <Users className="h-4 w-4 mr-2" />
-              <span>{activeSession.player_1_name} vs {activeSession.player_2_name}</span>
+              <Users className="h-3 w-3 mr-1" />
+              <span className="text-xs">{activeSession.player_1_name} vs {activeSession.player_2_name}</span>
             </div>
             <div className="flex items-center text-sm text-purple-200 drop-shadow-md">
-              <Crown className="h-4 w-4 mr-2" />
-              <span>{activeSession.game_type_name || 'Game'}</span>
+              <Crown className="h-3 w-3 mr-1" />
+              <span className="text-xs">{activeSession.game_type_name || 'Game'}</span>
             </div>
             <div className="flex items-center text-sm text-white/90 drop-shadow-md">
-              <Clock className="h-4 w-4 mr-2" />
-              <span>{getSessionDuration()}</span>
+              <Clock className="h-3 w-3 mr-1" />
+              <span className="text-xs">{getSessionDuration()}</span>
             </div>
             <div className="flex items-center text-sm text-green-200 drop-shadow-md">
-              <DollarSign className="h-4 w-4 mr-2" />
-              <span>PKR {calculateCurrentPrice()}.00</span>
+              <DollarSign className="h-3 w-3 mr-1" />
+              <span className="text-xs">PKR {calculateCurrentPrice()}.00</span>
             </div>
           </div>
         )}
 
         {/* Available Game Types for Available Tables */}
         {!activeSession && tablePricings.length > 0 && (
-          <div className="mb-4">
+          <div className="mb-4 flex-1">
             <p className="text-sm text-white/80 drop-shadow-md">
-              Available Game Types: {tablePricings.map(p => {
+              Available: {tablePricings.map(p => {
                 const gameType = gameTypes.find(gt => gt.id === p.game_type_id);
                 return gameType?.name;
               }).filter(Boolean).join(', ')}
@@ -338,58 +360,58 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
 
         {/* Action Buttons for Active Sessions */}
         {activeSession && (
-          <div className="space-y-2 mb-4">
+          <div className="space-y-2 mt-auto">
             {canCancel ? (
               <Button 
                 onClick={handleCancelSession}
                 disabled={isCancelling}
                 variant="destructive"
                 size="sm"
-                className="w-full"
+                className="w-full h-8 text-xs"
               >
-                <X className="h-4 w-4 mr-2" />
-                {isCancelling ? 'Cancelling...' : 'Cancel Session'}
+                <X className="h-3 w-3 mr-1" />
+                {isCancelling ? 'Cancelling...' : 'Cancel'}
               </Button>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1">
                 <Button 
                   onClick={() => handleAnnounceResult('player_1')}
                   disabled={isAnnouncingResult}
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white h-8 text-xs"
                   size="sm"
                 >
-                  <Trophy className="h-4 w-4 mr-2" />
+                  <Trophy className="h-3 w-3 mr-1" />
                   {activeSession.player_1_name} Lost
                 </Button>
                 <Button 
                   onClick={() => handleAnnounceResult('player_2')}
                   disabled={isAnnouncingResult}
-                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white h-8 text-xs"
                   size="sm"
                 >
-                  <Trophy className="h-4 w-4 mr-2" />
+                  <Trophy className="h-3 w-3 mr-1" />
                   {activeSession.player_2_name} Lost
                 </Button>
               </div>
             )}
             
-            <div className="flex gap-2">
+            <div className="flex gap-1">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setCanteenOrderOpen(true)}
-                className="flex-1"
+                className="flex-1 h-7 text-xs"
               >
-                Canteen Order
+                Canteen
               </Button>
               
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setPosOpen(true)}
-                className="flex-1"
+                className="flex-1 h-7 text-xs"
               >
-                <span>🛒</span>
+                POS
               </Button>
             </div>
           </div>
@@ -476,6 +498,15 @@ const EnhancedTableCard = ({ table, activeSessions }: EnhancedTableCardProps) =>
             }}
           />
         </>
+      )}
+
+      {/* Invoice Dialog */}
+      {sessionIdForInvoice && (
+        <InvoiceDetailDialog
+          open={invoiceDialogOpen}
+          onOpenChange={setInvoiceDialogOpen}
+          sessionId={sessionIdForInvoice}
+        />
       )}
     </Card>
   );
