@@ -1,3 +1,4 @@
+
 import { apiClient } from './apiClient';
 
 // Create invoice - matches /api/invoices endpoint
@@ -30,6 +31,7 @@ export const createInvoice = async (invoiceData: {
 export const getAllInvoices = async (params?: {
   status?: string;
   player_id?: number;
+  club_id?: number;
   page?: number;
   limit?: number;
 }): Promise<any> => {
@@ -37,13 +39,14 @@ export const getAllInvoices = async (params?: {
     const queryParams = new URLSearchParams();
     if (params?.status) queryParams.append('status', params.status);
     if (params?.player_id) queryParams.append('player_id', params.player_id.toString());
+    if (params?.club_id) queryParams.append('club_id', params.club_id.toString());
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
     const response = await apiClient.get(`/api/invoices?${queryParams.toString()}`);
     
     if (response.success) {
-      return response.data?.invoices || response.data || [];
+      return response.data;
     }
     
     throw new Error(response.message || 'Failed to fetch invoices');
@@ -104,6 +107,6 @@ export const deleteInvoice = async (id: number): Promise<void> => {
 };
 
 export const getInvoiceBySessionId = async (sessionId: number) => {
-  const response = await apiClient.get(`/invoices/session/${sessionId}`);
+  const response = await apiClient.get(`/api/invoices/session/${sessionId}`);
   return response.data;
 };

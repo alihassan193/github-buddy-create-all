@@ -7,38 +7,42 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, Search, Filter, Download, DollarSign, Clock, CheckCircle, AlertCircle } from "lucide-react";
-import { getAllSessions } from "@/services/sessionService";
+import { Eye, Search, Filter, Download, DollarSign, Clock, CheckCircle, AlertCircle, Calendar } from "lucide-react";
+import { getAllInvoices } from "@/services/invoiceService";
 import { InvoiceDetailDialog } from "@/components/InvoiceDetailDialog";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 const Invoices = () => {
   const { clubId, isLoading } = useData();
   const { toast } = useToast();
-  const [sessions, setSessions] = useState<any[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<any[]>([]);
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [filteredInvoices, setFilteredInvoices] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [paymentFilter, setPaymentFilter] = useState<string>('all');
-  const [selectedSession, setSelectedSession] = useState<any>(null);
+  const [invoiceTypeFilter, setInvoiceTypeFilter] = useState<string>('all');
+  const [selectedInvoice, setSelectedInvoice] = useState<any>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isFetching, setIsFetching] = useState(false);
+  const [dateFilter, setDateFilter] = useState<Date | undefined>(undefined);
 
-  const fetchSessions = async () => {
+  const fetchInvoices = async () => {
     if (!clubId) return;
     
     try {
       setIsFetching(true);
-      const response = await getAllSessions({ 
-        club_id: clubId,
-        status: 'completed'
+      const response = await getAllInvoices({ 
+        club_id: clubId
       });
       
-      if (response && response.sessions) {
-        setSessions(response.sessions);
-        setFilteredSessions(response.sessions);
+      if (response && response.invoices) {
+        setInvoices(response.invoices);
+        setFilteredInvoices(response.invoices);
       }
     } catch (error: any) {
-      console.error("Error fetching sessions:", error);
+      console.error("Error fetching invoices:", error);
       toast({
         title: "Error",
         description: error.message || "Failed to fetch invoices",
@@ -50,58 +54,74 @@ const Invoices = () => {
   };
 
   useEffect(() => {
-    fetchSessions();
+    fetchInvoices();
   }, [clubId]);
 
-  // Filter sessions based on search and filters
+  // Filter invoices based on search and filters
   useEffect(() => {
-    let filtered = sessions;
+    let filtered = invoices;
 
     // Search filter
     if (searchQuery) {
-      filtered = filtered.filter(session => 
-        session.player_1_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        session.player_2_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        session.table?.table_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        session.session_code?.toLowerCase().includes(searchQuery.toLowerCase())
+      filtered = filtered.filter(invoice => 
+        invoice.customer_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        invoice.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        invoice.player?.first_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        invoice.player?.last_name?.toLowerCase().includes(searchQuery.toLowerCase())
       );
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(session => session.status === statusFilter);
     }
 
     // Payment filter
     if (paymentFilter !== 'all') {
-      filtered = filtered.filter(session => session.payment_status === paymentFilter);
+      filtered = filtered.filter(invoice => invoice.payment_status === paymentFilter);
     }
 
-    setFilteredSessions(filtered);
-  }, [sessions, searchQuery, statusFilter, paymentFilter]);
+    // Invoice type filter
+    if (invoiceTypeFilter !== 'all') {
+      filtered = filtered.filter(invoice => invoice.invoice_type === invoiceTypeFilter);
+    }
 
-  const getStatusBadge = (status: string) => {
+    // Date filter
+    if (dateFilter) {
+      const filterDate = format(dateFilter, 'yyyy-MM-dd');
+      filtered = filtered.filter(invoice => 
+        format(new Date(invoice.createdAt), 'yyyy-MM-dd') === filterDate
+      );
+    }
+
+    setFilteredInvoices(filtered);
+  }, [invoices, searchQuery, paymentFilter, invoiceTypeFilter, dateFilter]);
+
+  const getPaymentBadge = (paymentStatus: string) => {
     const statusConfig = {
-      completed: { variant: "default" as const, icon: CheckCircle, color: "text-green-600" },
-      active: { variant: "secondary" as const, icon: Clock, color: "text-blue-600" },
-      cancelled: { variant: "destructive" as const, icon: AlertCircle, color: "text-red-600" }
+      paid: { variant: "default" as const, icon: CheckCircle, color: "bg-green-500 text-white" },
+      pending: { variant: "secondary" as const, icon: Clock, color: "bg-yellow-500 text-white" },
+      cancelled: { variant: "destructive" as const, icon: AlertCircle, color: "bg-red-500 text-white" }
     };
 
-    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.completed;
+    const config = statusConfig[paymentStatus as keyof typeof statusConfig] || statusConfig.pending;
     const Icon = config.icon;
 
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
-        <Icon className="h-3 w-3" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge className={config.color}>
+        <Icon className="h-3 w-3 mr-1" />
+        {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
       </Badge>
     );
   };
 
-  const getPaymentBadge = (paymentStatus: string) => {
+  const getInvoiceTypeBadge = (invoiceType: string) => {
+    const typeConfig = {
+      session: { color: "bg-blue-500 text-white", label: "Game Session" },
+      canteen_only: { color: "bg-orange-500 text-white", label: "Canteen Only" },
+      combined: { color: "bg-purple-500 text-white", label: "Combined" }
+    };
+
+    const config = typeConfig[invoiceType as keyof typeof typeConfig] || { color: "bg-gray-500 text-white", label: invoiceType };
+
     return (
-      <Badge variant={paymentStatus === 'paid' ? 'default' : 'secondary'}>
-        {paymentStatus.charAt(0).toUpperCase() + paymentStatus.slice(1)}
+      <Badge className={config.color}>
+        {config.label}
       </Badge>
     );
   };
@@ -110,19 +130,18 @@ const Invoices = () => {
     return new Date(dateString).toLocaleString();
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(amount);
+  const formatCurrency = (amount: string | number) => {
+    return `PKR ${parseFloat(amount.toString()).toFixed(2)}`;
   };
 
   const getTotalStats = () => {
-    const total = filteredSessions.reduce((acc, session) => acc + (session.total_amount || 0), 0);
-    const paid = filteredSessions
-      .filter(s => s.payment_status === 'paid')
-      .reduce((acc, session) => acc + (session.total_amount || 0), 0);
-    const pending = total - paid;
+    const total = filteredInvoices.reduce((acc, invoice) => acc + parseFloat(invoice.total_amount || 0), 0);
+    const paid = filteredInvoices
+      .filter(invoice => invoice.payment_status === 'paid')
+      .reduce((acc, invoice) => acc + parseFloat(invoice.total_amount || 0), 0);
+    const pending = filteredInvoices
+      .filter(invoice => invoice.payment_status === 'pending')
+      .reduce((acc, invoice) => acc + parseFloat(invoice.total_amount || 0), 0);
 
     return { total, paid, pending };
   };
@@ -146,8 +165,8 @@ const Invoices = () => {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold">Invoices & Billing</h1>
-          <p className="text-muted-foregrund">
-            Manage session invoices and track payments
+          <p className="text-muted-foreground">
+            Manage invoices and track payments
           </p>
         </div>
         <Button>
@@ -166,7 +185,7 @@ const Invoices = () => {
           <CardContent>
             <div className="text-2xl font-bold">{formatCurrency(stats.total)}</div>
             <p className="text-xs text-muted-foreground">
-              From {filteredSessions.length} sessions
+              From {filteredInvoices.length} invoices
             </p>
           </CardContent>
         </Card>
@@ -178,7 +197,7 @@ const Invoices = () => {
           <CardContent>
             <div className="text-2xl font-bold text-green-600">{formatCurrency(stats.paid)}</div>
             <p className="text-xs text-muted-foreground">
-              {filteredSessions.filter(s => s.payment_status === 'paid').length} paid sessions
+              {filteredInvoices.filter(invoice => invoice.payment_status === 'paid').length} paid invoices
             </p>
           </CardContent>
         </Card>
@@ -190,7 +209,7 @@ const Invoices = () => {
           <CardContent>
             <div className="text-2xl font-bold text-orange-600">{formatCurrency(stats.pending)}</div>
             <p className="text-xs text-muted-foreground">
-              {filteredSessions.filter(s => s.payment_status === 'pending').length} pending sessions
+              {filteredInvoices.filter(invoice => invoice.payment_status === 'pending').length} pending invoices
             </p>
           </CardContent>
         </Card>
@@ -201,70 +220,148 @@ const Invoices = () => {
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Search by player, table, or session code..."
+            placeholder="Search by customer name or invoice number..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="pl-10"
           />
         </div>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-full sm:w-40">
-            <Filter className="h-4 w-4 mr-2" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
-          </SelectContent>
-        </Select>
+        
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full sm:w-40 justify-start text-left font-normal",
+                !dateFilter && "text-muted-foreground"
+              )}
+            >
+              <Calendar className="mr-2 h-4 w-4" />
+              {dateFilter ? format(dateFilter, "PPP") : "Pick a date"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <CalendarComponent
+              mode="single"
+              selected={dateFilter}
+              onSelect={setDateFilter}
+              initialFocus
+              className={cn("p-3 pointer-events-auto")}
+            />
+          </PopoverContent>
+        </Popover>
+
         <Select value={paymentFilter} onValueChange={setPaymentFilter}>
           <SelectTrigger className="w-full sm:w-40">
+            <Filter className="h-4 w-4 mr-2" />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Payments</SelectItem>
             <SelectItem value="paid">Paid</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
+
+        <Select value={invoiceTypeFilter} onValueChange={setInvoiceTypeFilter}>
+          <SelectTrigger className="w-full sm:w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="session">Game Session</SelectItem>
+            <SelectItem value="canteen_only">Canteen Only</SelectItem>
+            <SelectItem value="combined">Combined</SelectItem>
+          </SelectContent>
+        </Select>
+
+        {(searchQuery || paymentFilter !== 'all' || invoiceTypeFilter !== 'all' || dateFilter) && (
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setSearchQuery('');
+              setPaymentFilter('all');
+              setInvoiceTypeFilter('all');
+              setDateFilter(undefined);
+            }}
+          >
+            Clear Filters
+          </Button>
+        )}
       </div>
 
       {/* Invoices Grid */}
-      {filteredSessions.length > 0 ? (
+      {filteredInvoices.length > 0 ? (
         <div className="grid gap-4">
-          {filteredSessions.map((session) => (
-            <Card key={session.id} className="hover:shadow-md transition-shadow">
+          {filteredInvoices.map((invoice) => (
+            <Card key={invoice.id} className="hover:shadow-md transition-shadow">
               <CardContent className="p-6">
                 <div className="flex justify-between items-start">
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold">{session.session_code}</h3>
-                      {getStatusBadge(session.status)}
-                      {getPaymentBadge(session.payment_status)}
+                  <div className="space-y-3 flex-1">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <h3 className="font-semibold text-lg">{invoice.invoice_number}</h3>
+                      {getPaymentBadge(invoice.payment_status)}
+                      {getInvoiceTypeBadge(invoice.invoice_type)}
                     </div>
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground block">Customer:</span>
+                        <span className="font-bold text-lg text-primary">
+                          {invoice.customer_name || 'N/A'}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <span className="text-muted-foreground block">Phone:</span>
+                        <span className="font-medium">
+                          {invoice.customer_phone || invoice.player?.phone || 'N/A'}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <span className="text-muted-foreground block">Date:</span>
+                        <span className="font-medium">
+                          {formatDateTime(invoice.createdAt)}
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <span className="text-muted-foreground block">Type:</span>
+                        <span className="font-medium">
+                          {invoice.invoice_type === 'session' ? 'Game Session' : 
+                           invoice.invoice_type === 'canteen_only' ? 'Canteen Only' : 
+                           'Combined'}
+                        </span>
+                      </div>
+                    </div>
+
                     <div className="text-sm text-muted-foreground space-y-1">
-                      <div>Table: {session.table?.table_number}</div>
-                      <div>Players: {session.player_1_name} vs {session.player_2_name}</div>
-                      <div>Duration: {session.duration_minutes || 0} minutes</div>
-                      <div>Started: {formatDateTime(session.start_time)}</div>
-                      {session.end_time && (
-                        <div>Ended: {formatDateTime(session.end_time)}</div>
+                      <div>Game Charges: PKR {parseFloat(invoice.game_charges || 0).toFixed(2)}</div>
+                      <div>Canteen Charges: PKR {parseFloat(invoice.canteen_charges || 0).toFixed(2)}</div>
+                      {invoice.payment_method && (
+                        <div>Payment Method: {invoice.payment_method}</div>
                       )}
                     </div>
                   </div>
-                  <div className="text-right space-y-2">
-                    <div className="text-2xl font-bold">
-                      {formatCurrency(session.total_amount || 0)}
+                  
+                  <div className="text-right space-y-3 ml-4">
+                    <div className="space-y-1">
+                      <div className="text-sm text-muted-foreground">Total Amount</div>
+                      <div className="text-3xl font-bold text-primary bg-primary/10 px-4 py-2 rounded-lg">
+                        {formatCurrency(invoice.total_amount || 0)}
+                      </div>
                     </div>
+                    
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setSelectedSession(session);
+                        setSelectedInvoice(invoice);
                         setIsDialogOpen(true);
                       }}
+                      className="w-full"
                     >
                       <Eye className="h-4 w-4 mr-2" />
                       View Details
@@ -279,7 +376,7 @@ const Invoices = () => {
         <Card>
           <CardContent className="text-center py-12">
             <p className="text-muted-foreground">
-              {searchQuery || statusFilter !== 'all' || paymentFilter !== 'all'
+              {searchQuery || paymentFilter !== 'all' || invoiceTypeFilter !== 'all' || dateFilter
                 ? 'No invoices match your current filters'
                 : 'No invoices found'
               }
@@ -289,12 +386,12 @@ const Invoices = () => {
       )}
 
       {/* Invoice Detail Dialog */}
-      {selectedSession && (
+      {selectedInvoice && (
         <InvoiceDetailDialog
-          invoice={selectedSession}
+          invoice={selectedInvoice}
           isOpen={isDialogOpen}
           onClose={() => setIsDialogOpen(false)}
-          onUpdate={fetchSessions}
+          onUpdate={fetchInvoices}
         />
       )}
     </div>
