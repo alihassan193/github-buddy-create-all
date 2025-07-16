@@ -9,6 +9,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { DataProvider } from "./context/DataContext";
 import { ClubSessionProvider } from "./context/ClubSessionContext";
 import MandatorySessionDialog from "./components/MandatorySessionDialog";
+import Navbar from "./components/Navbar";
 
 const queryClient = new QueryClient();
 
@@ -22,6 +23,7 @@ function App() {
             <ClubSessionProvider>
               <DataProvider>
                 <div className="min-h-screen bg-background font-sans antialiased">
+                  <Navbar />
                   <Suspense fallback={<div>Loading...</div>}>
                     <Routes>
                       <Route path="/*" element={<Index />} />
