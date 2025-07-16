@@ -55,3 +55,19 @@ export const getActiveClubSession = async (): Promise<any> => {
     throw error;
   }
 };
+
+// Get club session history
+export const getClubSessionHistory = async (clubId: number, page: number = 1, limit: number = 10): Promise<any> => {
+  try {
+    const response = await apiClient.get(`/api/sessions/${clubId}/club-session?page=${page}&limit=${limit}`);
+    
+    if (response.success) {
+      return response.data;
+    }
+    
+    throw new Error(response.message || 'Failed to get club session history');
+  } catch (error) {
+    console.error('Error getting club session history:', error);
+    throw error;
+  }
+};

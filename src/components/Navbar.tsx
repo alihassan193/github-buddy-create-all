@@ -14,7 +14,8 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import ClubSessionDialog from "./ClubSessionDialog";
-import { Clock, DollarSign } from "lucide-react";
+import ClubSessionHistoryDialog from "./ClubSessionHistoryDialog";
+import { Clock, DollarSign, History } from "lucide-react";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -78,6 +79,15 @@ const Navbar = () => {
               {/* Club Session Controls */}
               {canManageSession && (
                 <div className="flex items-center gap-2">
+                  {/* Session History Button */}
+                  <ClubSessionHistoryDialog 
+                    trigger={
+                      <Button variant="ghost" size="sm">
+                        <History className="h-4 w-4" />
+                      </Button>
+                    }
+                  />
+
                   {isSessionActive ? (
                     <Button
                       variant="outline"
