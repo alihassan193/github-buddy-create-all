@@ -23,11 +23,15 @@ export const ClubSessionProvider: React.FC<ClubSessionProviderProps> = ({ childr
   const { user } = useAuth();
 
   const refreshSession = async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoading(false);
+      return;
+    }
     
     try {
       setIsLoading(true);
       const session = await getActiveClubSession();
+      console.log('Active session from API:', session);
       setActiveSession(session);
     } catch (error) {
       console.error('Error fetching active club session:', error);
@@ -42,6 +46,7 @@ export const ClubSessionProvider: React.FC<ClubSessionProviderProps> = ({ childr
       refreshSession();
     } else {
       setIsLoading(false);
+      setActiveSession(null);
     }
   }, [user]);
 
@@ -52,6 +57,13 @@ export const ClubSessionProvider: React.FC<ClubSessionProviderProps> = ({ childr
     setActiveSession,
     isLoading,
   };
+
+  console.log('ClubSession context state:', {
+    activeSession,
+    isSessionActive: !!activeSession && !activeSession.closed_at,
+    isLoading,
+    userRole: user?.role
+  });
 
   return (
     <ClubSessionContext.Provider value={value}>

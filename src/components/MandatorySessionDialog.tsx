@@ -59,7 +59,12 @@ const MandatorySessionDialog = () => {
         title: "Success",
         description: "Club session started successfully",
       });
+      
+      // Clear form
+      setCash("");
+      setNotes("");
     } catch (error: any) {
+      console.error('Session start error:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to start club session",
@@ -70,9 +75,19 @@ const MandatorySessionDialog = () => {
     }
   };
 
+  // Don't render anything if not a manager or if loading
+  if (!user || user.role !== 'manager' || isLoading) {
+    return null;
+  }
+
+  // Don't render if session is already active
+  if (isSessionActive) {
+    return null;
+  }
+
   return (
     <Dialog open={showDialog} onOpenChange={() => {}}>
-      <DialogContent className="sm:max-w-md [&>button]:hidden">
+      <DialogContent className="sm:max-w-md [&>button]:hidden" onPointerDownOutside={(e) => e.preventDefault()} onEscapeKeyDown={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-amber-600">
             <AlertTriangle className="h-5 w-5" />
