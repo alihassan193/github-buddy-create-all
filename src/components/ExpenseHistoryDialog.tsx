@@ -1,4 +1,5 @@
 
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ const ExpenseHistoryDialog = ({ trigger }: ExpenseHistoryDialogProps) => {
       const response = await getExpenses(params);
       console.log('Expenses API response:', response);
       
+      // The API returns the data directly in response.data, not response.data.data
       if (response && response.data && response.data.expenses) {
         setExpenses(response.data.expenses);
         setTotalPages(response.data.pagination.totalPages);
@@ -233,3 +235,4 @@ const ExpenseHistoryDialog = ({ trigger }: ExpenseHistoryDialogProps) => {
 };
 
 export default ExpenseHistoryDialog;
+

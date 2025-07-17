@@ -1,3 +1,4 @@
+
 import { apiClient } from './apiClient';
 
 export interface CreateExpenseRequest {
@@ -56,7 +57,7 @@ export const createExpense = async (expenseData: CreateExpenseRequest): Promise<
   return response.data;
 };
 
-export const getExpenses = async (params: GetExpensesParams): Promise<ExpensesResponse> => {
+export const getExpenses = async (params: GetExpensesParams): Promise<any> => {
   const queryParams = new URLSearchParams();
   
   queryParams.append('club_id', params.club_id.toString());
