@@ -214,6 +214,8 @@ export const useAuthProvider = () => {
         title: "Logged out",
         description: "You have been logged out successfully"
       });
+      // Redirect to login page
+      window.location.href = '/login';
     } catch (error) {
       console.error("Logout error:", error);
     }

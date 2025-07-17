@@ -1,9 +1,14 @@
+import React, { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useClubSession } from '../context/ClubSessionContext';
+import { Button } from './ui/button';
+import { LogOut, Menu, X, History, Calendar, AlertCircle, Play, Square } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from './ui/sheet';
+import ClubSessionHistoryDialog from './ClubSessionHistoryDialog';
+import ExpenseDialog from './ExpenseDialog';
+import ExpenseHistoryDialog from './ExpenseHistoryDialog';
 
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
-import { useClubSession } from "@/context/ClubSessionContext";
-import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -14,15 +19,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Sheet,
-  SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
 } from "@/components/ui/sheet";
 import ClubSessionDialog from "./ClubSessionDialog";
-import ClubSessionHistoryDialog from "./ClubSessionHistoryDialog";
-import { Clock, DollarSign, History, Menu } from "lucide-react";
+import { Clock, DollarSign } from "lucide-react";
 
 const Navbar = () => {
   const { user, logout } = useAuth();
@@ -117,6 +118,9 @@ const Navbar = () => {
               {/* Club Session Controls */}
               {canManageSession && (
                 <div className="flex items-center gap-2">
+                  {/* Expense Management */}
+                  <ExpenseDialog onExpenseCreated={() => {}} />
+                  <ExpenseHistoryDialog />
                   {/* Session History Button */}
                   <ClubSessionHistoryDialog 
                     trigger={
