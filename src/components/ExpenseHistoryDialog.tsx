@@ -1,9 +1,9 @@
+
 import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
@@ -45,14 +45,23 @@ const ExpenseHistoryDialog = ({ trigger }: ExpenseHistoryDialogProps) => {
         ...(filters.to && { to: filters.to })
       };
 
+      console.log('Fetching expenses with params:', params);
       const response = await getExpenses(params);
-      setExpenses(response.data.expenses);
-      setTotalPages(response.data.pagination.totalPages);
-      setCurrentPage(page);
+      console.log('Expenses API response:', response);
+      
+      if (response && response.data && response.data.expenses) {
+        setExpenses(response.data.expenses);
+        setTotalPages(response.data.pagination.totalPages);
+        setCurrentPage(page);
+      } else {
+        console.error('Invalid response structure:', response);
+        setExpenses([]);
+      }
     } catch (error: any) {
+      console.error('Error fetching expenses:', error);
       toast({
         title: "Error",
-        description: error.response?.data?.message || "Failed to fetch expenses",
+        description: error.response?.data?.message || error.message || "Failed to fetch expenses",
         variant: "destructive"
       });
     } finally {
