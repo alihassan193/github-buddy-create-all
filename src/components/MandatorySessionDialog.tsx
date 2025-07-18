@@ -18,7 +18,7 @@ import {
 import { AlertTriangle, DollarSign } from "lucide-react";
 
 const MandatorySessionDialog = () => {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const { isSessionActive, refreshSession, isLoading } = useClubSession();
   const { toast } = useToast();
   const [cash, setCash] = useState("");
@@ -139,6 +139,19 @@ const MandatorySessionDialog = () => {
             disabled={isSubmitting}
           >
             {isSubmitting ? 'Starting Session...' : 'Start Club Session'}
+          </Button>
+          
+          <div className="flex items-center justify-center pt-2">
+            <span className="text-sm text-muted-foreground">or</span>
+          </div>
+          
+          <Button 
+            type="button" 
+            variant="outline" 
+            className="w-full" 
+            onClick={() => logout()}
+          >
+            Logout
           </Button>
         </form>
       </DialogContent>

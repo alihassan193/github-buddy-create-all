@@ -9,6 +9,7 @@ import { DataProvider } from "./context/DataContext";
 import { ClubSessionProvider } from "./context/ClubSessionContext";
 import MandatorySessionDialog from "./components/MandatorySessionDialog";
 import Navbar from "./components/Navbar";
+import ProtectedRoute from "./components/ProtectedRoute";
 import Dashboard from "./pages/Dashboard";
 import Tables from "./pages/Tables";
 import Sessions from "./pages/Sessions";
@@ -33,14 +34,14 @@ function App() {
                   <Navbar />
                   <Suspense fallback={<div>Loading...</div>}>
                     <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/tables" element={<Tables />} />
-                      <Route path="/sessions" element={<Sessions />} />
-                      <Route path="/invoices" element={<Invoices />} />
-                      <Route path="/canteen" element={<Canteen />} />
-                      <Route path="/reports" element={<Reports />} />
-                      <Route path="/admin" element={<Admin />} />
                       <Route path="/login" element={<Login />} />
+                      <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                      <Route path="/tables" element={<ProtectedRoute><Tables /></ProtectedRoute>} />
+                      <Route path="/sessions" element={<ProtectedRoute><Sessions /></ProtectedRoute>} />
+                      <Route path="/invoices" element={<ProtectedRoute><Invoices /></ProtectedRoute>} />
+                      <Route path="/canteen" element={<ProtectedRoute><Canteen /></ProtectedRoute>} />
+                      <Route path="/reports" element={<ProtectedRoute><Reports /></ProtectedRoute>} />
+                      <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
                     </Routes>
                   </Suspense>
                   <MandatorySessionDialog />
